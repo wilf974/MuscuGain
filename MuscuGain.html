@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <title>MuscuGain - Mode Local</title>
+    
+    <!-- PWA Manifest inline -->
+    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{"name":"MuscuGain","short_name":"MuscuGain","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/2936/2936886.png","sizes":"192x192","type":"image/png"}]}'>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0; /* Slate 200 */
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 3px; }
+
+        .neon-text { text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Pulse animation for active elements */
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .animate-pulse-soft { animation: pulse-soft 2s infinite; }
+
+        /* Video Modal Styles */
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+            background: #000;
+            border-radius: 12px;
+        }
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+        
+        .exercise-thumb {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            background-color: #1e293b;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- Data & Constants ---
+
+        // Mapping for specific YouTube Video IDs (Tutorials)
+        const VIDEO_MAPPING = {
+            // Chest
+            'Développé Couché Barre': '4Y2ZdHCOXok',
+            'Développé Incliné Barre': '8iPEnn-ltC8',
+            'Développé Incliné Haltères': '0G2_kpHG2kM',
+            'Dips (Pectoraux)': '2z8JmcrW-As',
+            'Pompes Classiques': 'IODxDxX7oi4',
+            'Écartés Couché Haltères': 'eozdVDA78K0',
+            // Back
+            'Tractions Pronation (Large)': 'eGo4IYlbE5g',
+            'Rowing Barre (Yates)': 'G8l_8chR5BE',
+            'Tirage Vertical Poitrine': 'CAwf7n6Luuc',
+            'Rowing Haltère Unilatéral': 'roCP6wCXPqo',
+            'Face Pull': 'V8dZqmIxbXXs', // corrected ID format placeholder
+            // Legs
+            'Squat Arrière (Back Squat)': 'U3HlEF_E9fo',
+            'Presse à Cuisses Inclinée': 'yZvxDvAXUy0',
+            'Fentes Bulgares': '2C-uNgKwPLE',
+            'Soulevé de Terre (Dos)': 'op9kVnSso6Q',
+            'Leg Extension': 'YyvSfVjQeL0',
+            // Shoulders
+            'Développé Militaire Debout (OHP)': '2yjwXTZQDDI',
+            'Élévations Latérales Haltères': '3VcKaXpzqRo',
+            'Oiseau Buste Penché': 'ttvfGg9d76c',
+            // Arms
+            'Curl Barre Droite': 'kwG2ipFRgfo',
+            'Extension Triceps Poulie Haute': '2-LAMcpzODU',
+            'Barre au Front': 'd_KZxk8_rV0',
+            // Abs
+            'Planche Classique': 'pSHjTRGQxQM',
+            'Crunch Sol': 'Xyd_fa5zoEU'
+        };
+
+        const EXERCISES_DB = {
+            chest: [
+                'Développé Couché Barre', 'Développé Couché Haltères', 
+                'Développé Incliné Barre', 'Développé Incliné Haltères', 
+                'Développé Décliné', 'Dips (Pectoraux)', 'Dips Lestés',
+                'Écartés Couché Haltères', 'Écartés Incliné Haltères',
+                'Écartés Poulie Vis-à-vis (Haut)', 'Écartés Poulie Vis-à-vis (Bas)',
+                'Pompes Classiques', 'Pompes Diamant', 'Pompes Lestées', 'Pompes Claquées',
+                'Pull Over Haltère', 'Chest Press Machine', 'Machine Convergente'
+            ],
+            back: [
+                'Tractions Pronation (Large)', 'Tractions Supination', 'Tractions Neutres',
+                'Tirage Vertical Poitrine', 'Tirage Vertical Prise Serrée',
+                'Rowing Barre (Yates)', 'Rowing Barre T (T-Bar)', 'Rowing Haltère Unilatéral',
+                'Tirage Horizontal Poulie Basse', 'Tirage Horizontal Machine',
+                'Pull Over Poulie Haute', 'Face Pull', 
+                'Extension Lombaires (Banc)', 'Good Morning', 'Soulevé de Terre (Dos)',
+                'Shrugs Barre', 'Shrugs Haltères'
+            ],
+            legs: [
+                'Squat Arrière (Back Squat)', 'Squat Avant (Front Squat)', 'Goblet Squat',
+                'Presse à Cuisses Inclinée', 'Hack Squat', 
+                'Fentes Marchées', 'Fentes Bulgares', 'Fentes Arrière', 'Fentes Latérales',
+                'Leg Extension', 'Sissy Squat',
+                'Leg Curl Couché', 'Leg Curl Assis', 'Soulevé de Terre Jambes Tendues', 'Nordic Curl',
+                'Hip Thrust Barre', 'Hip Thrust Machine', 'Glute Bridge',
+                'Machine à Adducteurs', 'Machine à Abducteurs',
+                'Mollets Debout', 'Mollets Assis', 'Mollets Presse'
+            ],
+            shoulders: [
+                'Développé Militaire Debout (OHP)', 'Développé Militaire Assis', 'Développé Haltères Assis',
+                'Développé Arnold', 'Développé Nuque (Guidé)',
+                'Élévations Latérales Haltères', 'Élévations Latérales Poulie', 'Élévations Latérales Machine',
+                'Élévations Frontales Haltères', 'Élévations Frontales Disque',
+                'Oiseau Buste Penché', 'Oiseau Poulie', 'Peck Deck Inversé',
+                'Tirage Menton (Barre/Poulie)'
+            ],
+            arms: [
+                'Curl Barre Droite', 'Curl Barre EZ', 'Curl Haltères Supination', 'Curl Marteau',
+                'Curl Incliné Haltères', 'Curl Pupitre (Larry Scott)', 'Curl Araignée', 'Curl Concentré',
+                'Tractions Supination (Biceps)',
+                'Extension Triceps Poulie Haute', 'Extension Triceps Corde',
+                'Barre au Front', 'Extension Nuque Haltère', 'Kickback Haltère/Poulie',
+                'Dips Banc', 'Dips Machine', 'Tate Press', 'Développé Couché Prise Serrée'
+            ],
+            abs: [
+                'Crunch Sol', 'Crunch Poulie Haute', 'Crunch Machine',
+                'Relevé de Jambes Suspendu', 'Relevé de Genoux (Chaise Romaine)', 'Relevé de Bassin Sol',
+                'Planche Classique', 'Planche Latérale', 'Planche Dynamique',
+                'Roue Abdominale (Ab Wheel)', 'Russian Twist', 'Mountain Climbers',
+                'Toes to Bar', 'Vacuum', 'Woodchopper (Poulie)'
+            ]
+        };
+        
+        const MUSCLE_LABELS = {
+            chest: 'Pectoraux',
+            back: 'Dos',
+            legs: 'Jambes',
+            shoulders: 'Épaules',
+            arms: 'Bras',
+            abs: 'Abdos'
+        };
+
+        const DEFAULT_ROUTINES = [
+            {
+                id: 'fullbody',
+                name: 'Full Body (Débutant)',
+                desc: 'Travaille tout le corps. Idéal 3x par semaine.',
+                exercises: [
+                    { name: 'Squat Arrière (Back Squat)', targetSets: 4 },
+                    { name: 'Développé Couché Barre', targetSets: 4 },
+                    { name: 'Tirage Vertical Poitrine', targetSets: 4 },
+                    { name: 'Développé Militaire Debout (OHP)', targetSets: 3 },
+                    { name: 'Curl Barre Droite', targetSets: 3 },
+                    { name: 'Planche Classique', targetSets: 3 }
+                ]
+            },
+            {
+                id: 'push',
+                name: 'Push (Poussée)',
+                desc: 'Pectoraux, Épaules, Triceps.',
+                exercises: [
+                    { name: 'Développé Couché Barre', targetSets: 4 },
+                    { name: 'Développé Incliné Haltères', targetSets: 4 },
+                    { name: 'Développé Militaire Assis', targetSets: 4 },
+                    { name: 'Élévations Latérales Haltères', targetSets: 4 },
+                    { name: 'Dips (Pectoraux)', targetSets: 3 },
+                    { name: 'Extension Triceps Poulie Haute', targetSets: 3 }
+                ]
+            },
+            {
+                id: 'pull',
+                name: 'Pull (Tirage)',
+                desc: 'Dos, Biceps, Arrière d\'épaule.',
+                exercises: [
+                    { name: 'Tractions Pronation (Large)', targetSets: 4 },
+                    { name: 'Rowing Barre (Yates)', targetSets: 4 },
+                    { name: 'Tirage Vertical Poitrine', targetSets: 3 },
+                    { name: 'Face Pull', targetSets: 4 },
+                    { name: 'Curl Barre EZ', targetSets: 4 },
+                    { name: 'Curl Marteau', targetSets: 3 }
+                ]
+            },
+            {
+                id: 'legs',
+                name: 'Legs (Jambes)',
+                desc: 'Quadriceps, Ischios, Mollets.',
+                exercises: [
+                    { name: 'Squat Arrière (Back Squat)', targetSets: 4 },
+                    { name: 'Presse à Cuisses Inclinée', targetSets: 4 },
+                    { name: 'Fentes Bulgares', targetSets: 3 },
+                    { name: 'Leg Extension', targetSets: 3 },
+                    { name: 'Leg Curl Assis', targetSets: 4 },
+                    { name: 'Mollets Debout', targetSets: 4 }
+                ]
+            }
+        ];
+
+        // --- Icons Components ---
+        const Icon = ({ name, size = 20, className }) => {
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                if (window.lucide && containerRef.current) {
+                    const iconElement = document.createElement('i');
+                    iconElement.setAttribute('data-lucide', name);
+                    containerRef.current.innerHTML = '';
+                    containerRef.current.appendChild(iconElement);
+                    window.lucide.createIcons({
+                        root: containerRef.current,
+                        nameAttr: 'data-lucide',
+                        attrs: {
+                            class: `lucide lucide-${name} ${className || ''}`,
+                            width: size,
+                            height: size
+                        }
+                    });
+                }
+            }, [name, size, className]);
+
+            return <span ref={containerRef} className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}></span>;
+        };
+
+        // --- Utility Components ---
+        const Button = ({ children, onClick, variant = 'primary', className = '', fullWidth = false }) => {
+            const baseStyle = "px-4 py-3 rounded-xl font-semibold transition-all duration-200 active:scale-95 flex items-center justify-center gap-2";
+            const variants = {
+                primary: "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/50",
+                secondary: "bg-slate-700 hover:bg-slate-600 text-slate-200",
+                danger: "bg-red-500/20 text-red-400 hover:bg-red-500/30",
+                ghost: "bg-transparent hover:bg-slate-800 text-slate-400 hover:text-white",
+                success: "bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/50"
+            };
+            return (
+                <button 
+                    onClick={onClick} 
+                    className={`${baseStyle} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
+                >
+                    {children}
+                </button>
+            );
+        };
+
+        const Card = ({ children, className = '' }) => (
+            <div className={`bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-2xl p-4 ${className}`}>
+                {children}
+            </div>
+        );
+
+        // --- Install Prompt Component ---
+        const InstallPrompt = () => {
+            const [showPrompt, setShowPrompt] = useState(false);
+            const [platform, setPlatform] = useState(null); // 'ios' or 'android' or 'other'
+
+            useEffect(() => {
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+                if (isStandalone) return;
+
+                const ua = window.navigator.userAgent;
+                const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+                const isAndroid = /Android/.test(ua);
+
+                if (isIOS) {
+                    setPlatform('ios');
+                    setShowPrompt(true);
+                } else if (isAndroid) {
+                    setPlatform('android');
+                    setShowPrompt(true);
+                }
+            }, []);
+
+            if (!showPrompt) return null;
+
+            return (
+                <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-800 border-t border-slate-700 p-4 shadow-2xl animate-fade-in">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-600 p-2 rounded-lg">
+                                <Icon name="download" className="text-white" size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white text-sm">Installer l'application</h4>
+                                <p className="text-xs text-slate-400">Pour une meilleure expérience</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setShowPrompt(false)} className="text-slate-500 hover:text-white">
+                            <Icon name="x" size={20} />
+                        </button>
+                    </div>
+                    
+                    <div className="text-sm text-slate-300 mt-2 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                        {platform === 'ios' ? (
+                            <div className="flex items-center gap-2">
+                                <span>Appuyez sur</span>
+                                <Icon name="share" size={16} className="text-blue-400" />
+                                <span>puis <strong>"Sur l'écran d'accueil"</strong></span>
+                                <Icon name="plus-square" size={16} className="text-slate-400" />
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <span>Appuyez sur le menu</span>
+                                <Icon name="more-vertical" size={16} className="text-slate-400" />
+                                <span>puis <strong>"Ajouter à l'écran d'accueil"</strong></span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Video Modal Component ---
+        const VideoModal = ({ exerciseName, onClose }) => {
+            const videoId = VIDEO_MAPPING[exerciseName];
+            // Construction d'URL robuste pour mobile
+            const youtubeAppUrl = `vnd.youtube:${videoId}`;
+            const youtubeWebUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            const searchUrl = `https://www.youtube.com/results?search_query=technique+execution+${encodeURIComponent(exerciseName)}`;
+
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm fade-in" onClick={onClose}>
+                    <div className="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center p-4 border-b border-slate-700 bg-slate-900/50">
+                            <h3 className="font-bold text-white text-lg pr-4 truncate">{exerciseName}</h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-2">
+                                <Icon name="x" size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-4 overflow-y-auto">
+                            {videoId ? (
+                                <div className="space-y-4">
+                                    {/* Wrapper vidéo avec message d'erreur en arrière-plan */}
+                                    <div className="relative bg-black rounded-xl overflow-hidden aspect-video shadow-lg border border-slate-700">
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 z-0 p-4 text-center">
+                                            <Icon name="alert-circle" size={32} className="mb-2 opacity-50" />
+                                            <span className="text-xs">Si la vidéo ne charge pas (Erreur 150/153), le propriétaire l'a bloquée sur les sites externes.</span>
+                                        </div>
+                                        <iframe 
+                                            className="relative z-10 w-full h-full"
+                                            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&origin=${window.location.origin}`} 
+                                            title={exerciseName}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                            allowFullScreen
+                                            referrerPolicy="no-referrer"
+                                        ></iframe>
+                                    </div>
+
+                                    {/* Boutons d'action clairs */}
+                                    <div className="bg-slate-700/30 p-4 rounded-xl border border-slate-700/50">
+                                        <p className="text-sm text-slate-300 mb-3 font-medium flex items-center gap-2">
+                                            <Icon name="info" size={16} className="text-blue-400" />
+                                            La vidéo ne se lance pas ?
+                                        </p>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            <a 
+                                                href={youtubeWebUrl} 
+                                                target="_blank" 
+                                                className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-3 rounded-lg font-bold transition-all shadow-lg active:scale-95"
+                                            >
+                                                <Icon name="youtube" size={20} />
+                                                Ouvrir dans l'app YouTube
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <div className="bg-red-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse-soft">
+                                        <Icon name="search" size={32} className="text-red-500" />
+                                    </div>
+                                    <h4 className="text-white font-bold mb-2">Pas de vidéo intégrée</h4>
+                                    <p className="text-slate-400 text-sm mb-6 px-4">Nous n'avons pas encore sélectionné de tutoriel spécifique pour cet exercice.</p>
+                                    <a 
+                                        href={searchUrl} 
+                                        target="_blank" 
+                                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+                                    >
+                                        <Icon name="search" size={18} />
+                                        Rechercher sur YouTube
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Confirmation Modal Component (New) ---
+        const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in" onClick={onClose}>
+                    <div className="bg-slate-800 rounded-2xl w-full max-w-sm border border-slate-700 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4 text-red-400">
+                            <Icon name="alert-triangle" size={24} />
+                            <h3 className="text-xl font-bold text-white">{title}</h3>
+                        </div>
+                        <p className="text-slate-300 mb-6 text-sm">{message}</p>
+                        <div className="flex gap-3">
+                            <Button onClick={onClose} variant="ghost" fullWidth>Annuler</Button>
+                            <Button onClick={() => { onConfirm(); onClose(); }} variant="danger" fullWidth>Supprimer</Button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App Component ---
+
+        const App = () => {
+            const [view, setView] = useState('dashboard');
+            const [activeRoutine, setActiveRoutine] = useState(null);
+            const [workoutData, setWorkoutData] = useState({});
+            const [history, setHistory] = useState([]);
+            const [customRoutines, setCustomRoutines] = useState([]);
+            const [showVideoFor, setShowVideoFor] = useState(null);
+            
+            // Confirmation Modal State
+            const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, id: null, title: '', message: '' });
+
+            // --- Timer States ---
+            const [sessionStartTime, setSessionStartTime] = useState(null);
+            const [phaseStartTime, setPhaseStartTime] = useState(null);
+            const [phaseInitialDuration, setPhaseInitialDuration] = useState(0); 
+            
+            const [restStartTime, setRestStartTime] = useState(null);
+            const [restInitialDuration, setRestInitialDuration] = useState(0);
+
+            // Display values
+            const [sessionDuration, setSessionDuration] = useState(0);
+            const [phaseTimer, setPhaseTimer] = useState(0);
+            const [restTimer, setRestTimer] = useState(0);
+            const [isRestTimerRunning, setIsRestTimerRunning] = useState(false);
+
+            // Configuration
+            const [targetWarmupTime, setTargetWarmupTime] = useState(600);
+            const [restDuration, setRestDuration] = useState(60); 
+
+            // Create Routine State
+            const [newRoutineName, setNewRoutineName] = useState('');
+            const [newRoutineExercises, setNewRoutineExercises] = useState([]);
+            const [expandedCategory, setExpandedCategory] = useState(null);
+
+            // --- Initialization & Restoration ---
+            useEffect(() => {
+                const savedHistory = localStorage.getItem('muscuGainHistory');
+                if (savedHistory) setHistory(JSON.parse(savedHistory));
+                const savedRoutines = localStorage.getItem('muscuGainCustomRoutines');
+                if (savedRoutines) setCustomRoutines(JSON.parse(savedRoutines));
+
+                const savedSession = localStorage.getItem('muscuGainActiveSession');
+                if (savedSession) {
+                    try {
+                        const session = JSON.parse(savedSession);
+                        if (session.activeRoutine && session.view) {
+                            setActiveRoutine(session.activeRoutine);
+                            setWorkoutData(session.workoutData);
+                            setView(session.view);
+                            
+                            setSessionStartTime(session.sessionStartTime);
+                            setPhaseStartTime(session.phaseStartTime);
+                            setPhaseInitialDuration(session.phaseInitialDuration);
+                            setRestStartTime(session.restStartTime);
+                            setRestInitialDuration(session.restInitialDuration);
+                            setIsRestTimerRunning(session.isRestTimerRunning);
+                            setTargetWarmupTime(session.targetWarmupTime || 600);
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('muscuGainActiveSession');
+                    }
+                }
+            }, []);
+
+            // --- Auto-Save Active Session ---
+            useEffect(() => {
+                if (activeRoutine && ['setup', 'warmup', 'workout', 'cooldown'].includes(view)) {
+                    const sessionState = {
+                        view,
+                        activeRoutine,
+                        workoutData,
+                        sessionStartTime,
+                        phaseStartTime,
+                        phaseInitialDuration,
+                        restStartTime,
+                        restInitialDuration,
+                        isRestTimerRunning,
+                        targetWarmupTime,
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem('muscuGainActiveSession', JSON.stringify(sessionState));
+                }
+            }, [view, activeRoutine, workoutData, sessionStartTime, phaseStartTime, restStartTime, isRestTimerRunning, targetWarmupTime]);
+
+
+            // --- Timer Logic ---
+            useEffect(() => {
+                let interval;
+                if (isRestTimerRunning && restStartTime) {
+                    interval = setInterval(() => {
+                        const now = Date.now();
+                        const elapsed = Math.floor((now - restStartTime) / 1000);
+                        const remaining = Math.max(0, restInitialDuration - elapsed);
+                        setRestTimer(remaining);
+                        
+                        if (remaining === 0) {
+                            setIsRestTimerRunning(false);
+                            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        }
+                    }, 200);
+                }
+                return () => clearInterval(interval);
+            }, [isRestTimerRunning, restStartTime, restInitialDuration]);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    const now = Date.now();
+                    if (view === 'workout' && sessionStartTime) {
+                        setSessionDuration(Math.floor((now - sessionStartTime) / 1000));
+                    } else if (view === 'cooldown' && phaseStartTime) {
+                        setPhaseTimer(Math.floor((now - phaseStartTime) / 1000));
+                    } else if (view === 'warmup' && phaseStartTime) {
+                        const elapsed = Math.floor((now - phaseStartTime) / 1000);
+                        setPhaseTimer(Math.max(0, phaseInitialDuration - elapsed));
+                    }
+                }, 500); 
+                return () => clearInterval(interval);
+            }, [view, sessionStartTime, phaseStartTime, phaseInitialDuration]);
+
+
+            // --- Logic Functions ---
+
+            const getLastLog = (exerciseName) => {
+                for (let session of history) {
+                    if (session.exercises && session.exercises[exerciseName]) {
+                        const sets = session.exercises[exerciseName];
+                        for (let i = sets.length - 1; i >= 0; i--) {
+                            if (sets[i].weight && sets[i].done) {
+                                return { weight: sets[i].weight, reps: sets[i].reps };
+                            }
+                        }
+                    }
+                }
+                return null;
+            };
+
+            // --- Coach Algorithm ---
+            const getCoachAdvice = useMemo(() => {
+                if (history.length === 0) return { type: 'info', title: 'Bienvenue !', text: "Complétez votre première séance pour débloquer l'analyse du coach.", icon: 'star' };
+                const lastSession = history[0];
+                const daysSinceLast = Math.floor((Date.now() - new Date(lastSession.date).getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSinceLast > 7) return { type: 'warning', title: 'Attention au rythme', text: "Cela fait plus d'une semaine. La régularité est la clé.", icon: 'alert-triangle' };
+                const previousSameRoutine = history.slice(1).find(h => h.routineName === lastSession.routineName);
+                if (previousSameRoutine) {
+                    const volDiff = lastSession.totalVolume - previousSameRoutine.totalVolume;
+                    if (volDiff > 50) return { type: 'success', title: 'Excellente progression !', text: `Volume augmenté de ${Math.round(volDiff)}kg. Continuez !`, icon: 'trending-up' };
+                    else if (volDiff < -50) return { type: 'neutral', title: 'Volume en baisse', text: `Volume en baisse. Assurez-vous de bien récupérer.`, icon: 'activity' };
+                }
+                const tips = ["Visez 8-12 répétitions.", "Pensez à la semaine de décharge.", "Dormez 7-9h.", "Mangez ~1.8g de protéines/kg.", "Contrôlez la descente."];
+                return { type: 'info', title: 'Conseil du Coach', text: tips[history.length % tips.length], icon: 'lightbulb' };
+            }, [history]);
+
+            const saveCustomRoutine = () => {
+                if (!newRoutineName.trim() || newRoutineExercises.length === 0) return;
+                const newRoutine = { id: 'custom_' + Date.now(), name: newRoutineName, desc: 'Programme personnalisé', exercises: newRoutineExercises, isCustom: true };
+                const updatedRoutines = [newRoutine, ...customRoutines];
+                setCustomRoutines(updatedRoutines);
+                localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updatedRoutines));
+                setNewRoutineName('');
+                setNewRoutineExercises([]);
+                setView('dashboard');
+            };
+
+            // Replace native confirm with Modal trigger
+            const requestDeleteRoutine = (e, id) => {
+                e.stopPropagation();
+                setConfirmModal({
+                    isOpen: true,
+                    type: 'routine',
+                    id: id,
+                    title: 'Supprimer ce programme ?',
+                    message: 'Cette action est irréversible. Le programme sera retiré de votre liste.'
+                });
+            };
+
+            const requestDeleteHistory = (e, index) => {
+                e.stopPropagation();
+                setConfirmModal({
+                    isOpen: true,
+                    type: 'history',
+                    id: index,
+                    title: 'Supprimer cette séance ?',
+                    message: 'Elle disparaîtra définitivement de votre historique et des statistiques.'
+                });
+            };
+
+            const handleConfirmDelete = () => {
+                if (confirmModal.type === 'routine') {
+                    const updated = customRoutines.filter(r => r.id !== confirmModal.id);
+                    setCustomRoutines(updated);
+                    localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+                } else if (confirmModal.type === 'history') {
+                    const newHistory = history.filter((_, i) => i !== confirmModal.id);
+                    setHistory(newHistory);
+                    localStorage.setItem('muscuGainHistory', JSON.stringify(newHistory));
+                }
+                setConfirmModal({ ...confirmModal, isOpen: false });
+            };
+
+            const toggleExerciseSelection = (exerciseName) => {
+                const existingIndex = newRoutineExercises.findIndex(ex => ex.name === exerciseName);
+                if (existingIndex >= 0) {
+                    setNewRoutineExercises(newRoutineExercises.filter((_, idx) => idx !== existingIndex));
+                } else {
+                    setNewRoutineExercises([...newRoutineExercises, { name: exerciseName, targetSets: 4 }]);
+                }
+            };
+
+            const updateExerciseSets = (exerciseName, newSets) => {
+                const updated = newRoutineExercises.map(ex => {
+                    if (ex.name === exerciseName) return { ...ex, targetSets: Math.max(1, newSets) };
+                    return ex;
+                });
+                setNewRoutineExercises(updated);
+            };
+
+            const triggerSetup = (routine) => {
+                const initialData = {};
+                routine.exercises.forEach(exEntry => {
+                    const exName = typeof exEntry === 'string' ? exEntry : exEntry.name;
+                    const targetSets = typeof exEntry === 'string' ? 4 : (exEntry.targetSets || 4);
+                    const lastLog = getLastLog(exName);
+                    initialData[exName] = [];
+                    for(let i = 0; i < targetSets; i++) {
+                        initialData[exName].push({ weight: lastLog ? lastLog.weight : '', reps: '', done: false });
+                    }
+                });
+                setWorkoutData(initialData);
+                setActiveRoutine(routine);
+                setView('setup');
+            };
+            
+            const cancelSession = () => {
+                if(confirm("Annuler la séance ?")) {
+                    localStorage.removeItem('muscuGainActiveSession');
+                    setActiveRoutine(null);
+                    setWorkoutData({});
+                    setView('dashboard');
+                    setSessionStartTime(null);
+                    setPhaseStartTime(null);
+                    setRestStartTime(null);
+                    setIsRestTimerRunning(false);
+                }
+            };
+
+            const confirmSetupAndStart = () => {
+                if (targetWarmupTime > 0) {
+                    setPhaseStartTime(Date.now());
+                    setPhaseInitialDuration(targetWarmupTime);
+                    setPhaseTimer(targetWarmupTime); 
+                    setView('warmup');
+                } else {
+                    startMainWorkout();
+                }
+            };
+
+            const startMainWorkout = () => {
+                setSessionStartTime(Date.now());
+                setSessionDuration(0);
+                setView('workout');
+            };
+
+            const finishMainWorkout = () => {
+                setPhaseStartTime(Date.now());
+                setPhaseTimer(0);
+                setView('cooldown');
+            };
+
+            const saveAndExit = () => {
+                const newEntry = {
+                    date: new Date().toISOString(),
+                    routineName: activeRoutine.name,
+                    exercises: workoutData,
+                    totalVolume: calculateVolume(workoutData),
+                    durationSeconds: sessionDuration
+                };
+                const newHistory = [newEntry, ...history];
+                setHistory(newHistory);
+                localStorage.setItem('muscuGainHistory', JSON.stringify(newHistory));
+                localStorage.removeItem('muscuGainActiveSession');
+                setView('dashboard');
+                setActiveRoutine(null);
+                setSessionStartTime(null);
+                setPhaseStartTime(null);
+            };
+
+            const calculateVolume = (data) => {
+                let vol = 0;
+                Object.values(data).forEach(sets => {
+                    sets.forEach(set => {
+                        if (set.done && set.weight && set.reps) vol += parseFloat(set.weight) * parseFloat(set.reps);
+                    });
+                });
+                return vol;
+            };
+
+            const updateSet = (exercise, index, field, value) => {
+                const newData = { ...workoutData };
+                newData[exercise][index][field] = value;
+                setWorkoutData(newData);
+            };
+
+            const addSet = (exercise) => {
+                const newData = { ...workoutData };
+                const prevSet = newData[exercise][newData[exercise].length - 1];
+                newData[exercise].push({ weight: prevSet ? prevSet.weight : '', reps: prevSet ? prevSet.reps : '', done: false });
+                setWorkoutData(newData);
+            };
+
+            const toggleSetDone = (exercise, index) => {
+                const newData = { ...workoutData };
+                newData[exercise][index].done = !newData[exercise][index].done;
+                setWorkoutData(newData);
+                if (newData[exercise][index].done) startRestTimer();
+            };
+
+            const startRestTimer = () => {
+                setRestInitialDuration(restDuration);
+                setRestStartTime(Date.now());
+                setRestTimer(restDuration); 
+                setIsRestTimerRunning(true);
+            };
+            
+            const addTimeRest = () => {
+                setRestInitialDuration(prev => prev + 30);
+            };
+
+            const formatTime = (seconds) => {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m}:${s < 10 ? '0' : ''}${s}`;
+            };
+            
+            const formatDuration = (seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = seconds % 60;
+                if(h > 0) return `${h}h ${m}m ${s}s`;
+                return `${m}m ${s}s`;
+            };
+
+            // --- Views ---
+
+            const renderCreateRoutine = () => (
+                <div className="pb-32 fade-in">
+                    <header className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md py-4 border-b border-slate-800 flex items-center gap-4 mb-6">
+                        <button onClick={() => setView('dashboard')} className="text-slate-400 hover:text-white"><Icon name="chevron-left" /></button>
+                        <h2 className="font-bold text-lg text-white">Créer un programme</h2>
+                    </header>
+                    <div className="space-y-6">
+                        <div>
+                            <label className="block text-xs text-slate-400 uppercase font-bold mb-2">Nom du programme</label>
+                            <input type="text" placeholder="Ex: Pectoraux / Biceps" value={newRoutineName} onChange={(e) => setNewRoutineName(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none transition-colors" />
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-xs text-slate-400 uppercase font-bold">Exercices ({newRoutineExercises.length})</label>
+                                {newRoutineExercises.length > 0 && <button onClick={() => setNewRoutineExercises([])} className="text-xs text-red-400 hover:text-red-300">Tout effacer</button>}
+                            </div>
+                            {newRoutineExercises.length > 0 ? (
+                                <div className="bg-slate-800 rounded-xl p-2 space-y-1">
+                                    {newRoutineExercises.map((exObj, idx) => (
+                                        <div key={idx} className="flex justify-between items-center bg-slate-700/50 p-3 rounded-lg">
+                                            <span className="text-sm font-medium flex-1 truncate mr-2">{exObj.name}</span>
+                                            <div className="flex items-center gap-2 mr-3">
+                                                <span className="text-xs text-slate-400">Séries:</span>
+                                                <input type="number" value={exObj.targetSets} onChange={(e) => updateExerciseSets(exObj.name, parseInt(e.target.value))} className="w-12 bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                            </div>
+                                            <button onClick={() => toggleExerciseSelection(exObj.name)} className="text-slate-400 hover:text-red-400"><Icon name="x" size={16} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-slate-800/30 border border-dashed border-slate-700 rounded-xl p-6 text-center text-slate-500 text-sm">Sélectionnez des exercices ci-dessous</div>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs text-slate-400 uppercase font-bold mb-3">Ajouter des exercices</label>
+                            <div className="space-y-3">
+                                {Object.entries(EXERCISES_DB).map(([category, exercises]) => {
+                                    const isExpanded = expandedCategory === category;
+                                    return (
+                                        <div key={category} className="border border-slate-700 rounded-xl overflow-hidden bg-slate-800/50">
+                                            <button onClick={() => setExpandedCategory(isExpanded ? null : category)} className="w-full flex justify-between items-center p-4 hover:bg-slate-700/50 transition-colors">
+                                                <div className="flex items-center gap-3"><div className={`w-2 h-8 rounded-full ${isExpanded ? 'bg-blue-500' : 'bg-slate-600'}`}></div><span className="font-semibold text-white capitalize">{MUSCLE_LABELS[category]}</span></div>
+                                                <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={16} className="text-slate-400" />
+                                            </button>
+                                            {isExpanded && <div className="p-2 pt-0 bg-slate-900/50 border-t border-slate-700/50 grid grid-cols-1 gap-1">
+                                                {exercises.map(ex => {
+                                                    const isSelected = newRoutineExercises.some(item => item.name === ex);
+                                                    return (
+                                                        <button key={ex} onClick={() => toggleExerciseSelection(ex)} className={`flex justify-between items-center p-3 rounded-lg text-sm text-left transition-all ${isSelected ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30' : 'hover:bg-slate-700/50 text-slate-300'}`}>
+                                                            {ex} {isSelected && <Icon name="check" size={14} className="text-blue-400" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="pt-4">
+                            <Button fullWidth variant={newRoutineName && newRoutineExercises.length > 0 ? "success" : "secondary"} onClick={saveCustomRoutine} className={!(newRoutineName && newRoutineExercises.length > 0) ? "opacity-50 cursor-not-allowed" : ""}>Sauvegarder le programme</Button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderDashboard = () => (
+                <div className="space-y-6 pb-24 fade-in">
+                    <header className="flex justify-between items-center mb-6">
+                        <div><h1 className="text-2xl font-bold text-white neon-text">MuscuGain</h1><p className="text-slate-400 text-sm">Mode Local • Privé</p></div>
+                        <div className="bg-slate-800 p-2 rounded-full"><Icon name="dumbbell" className="text-blue-500" /></div>
+                    </header>
+                    <div className={`p-4 rounded-xl border flex items-start gap-4 shadow-lg ${getCoachAdvice.type === 'success' ? 'bg-green-900/20 border-green-500/30' : getCoachAdvice.type === 'warning' ? 'bg-orange-900/20 border-orange-500/30' : 'bg-blue-900/20 border-blue-500/30'}`}>
+                        <div className={`p-2 rounded-full ${getCoachAdvice.type === 'success' ? 'bg-green-500/20 text-green-400' : getCoachAdvice.type === 'warning' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}><Icon name={getCoachAdvice.icon} size={24} /></div>
+                        <div><h3 className={`font-bold ${getCoachAdvice.type === 'success' ? 'text-green-400' : getCoachAdvice.type === 'warning' ? 'text-orange-400' : 'text-blue-400'}`}>{getCoachAdvice.title}</h3><p className="text-sm text-slate-300 mt-1">{getCoachAdvice.text}</p></div>
+                    </div>
+                    {activeRoutine && (
+                         <div className="bg-blue-600/20 border border-blue-500/50 rounded-xl p-4 mb-6 flex justify-between items-center animate-pulse-soft">
+                            <div><h3 className="text-blue-400 font-bold">Séance en cours</h3><p className="text-xs text-blue-200">{activeRoutine.name}</p></div>
+                            <Button onClick={() => setView('workout')} className="py-2 text-xs">Reprendre</Button>
+                        </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                        <Card className="flex flex-col items-center justify-center py-6"><span className="text-3xl font-bold text-blue-400">{history.length}</span><span className="text-xs text-slate-400 uppercase tracking-wide mt-1">Séances</span></Card>
+                        <Card className="flex flex-col items-center justify-center py-6"><span className="text-3xl font-bold text-green-400">{history.length > 0 ? Math.round(history.reduce((acc, curr) => acc + curr.totalVolume, 0) / 1000) + 'k' : '0'}</span><span className="text-xs text-slate-400 uppercase tracking-wide mt-1">Volume (kg)</span></Card>
+                    </div>
+                    <div className="flex justify-between items-end mt-8 mb-4">
+                        <h2 className="text-lg font-semibold text-white">Programmes</h2>
+                        <button onClick={() => setView('create')} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-500/30"><Icon name="plus" size={14} /> Créer</button>
+                    </div>
+                    <div className="space-y-4">
+                        {customRoutines.length > 0 && (
+                            <div className="space-y-4 mb-6">
+                                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Mes Programmes</div>
+                                {customRoutines.map(routine => (
+                                    <Card key={routine.id} className="relative overflow-hidden group border-blue-500/30 bg-slate-800/80">
+                                        <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-400"><Icon name="user" size={60} /></div>
+                                        <div className="flex justify-between items-start mb-2"><h3 className="text-xl font-bold text-white">{routine.name}</h3><button onClick={(e) => requestDeleteRoutine(e, routine.id)} className="text-slate-600 hover:text-red-400 transition-colors p-1"><Icon name="trash-2" size={16} /></button></div>
+                                        <p className="text-slate-400 text-sm mb-4 line-clamp-1">{routine.exercises.length} exercices • Personnalisé</p>
+                                        <Button fullWidth onClick={() => triggerSetup(routine)} className="bg-slate-700 hover:bg-blue-600 transition-colors">Commencer <Icon name="play" size={16} /></Button>
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
+                        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Exemples</div>
+                        {DEFAULT_ROUTINES.map(routine => (
+                            <Card key={routine.id} className="relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-10"><Icon name="activity" size={60} /></div>
+                                <h3 className="text-xl font-bold text-white">{routine.name}</h3>
+                                <p className="text-slate-400 text-sm mb-4 line-clamp-1">{routine.desc}</p>
+                                <Button fullWidth onClick={() => triggerSetup(routine)}>Commencer <Icon name="play" size={16} /></Button>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderSessionSetup = () => (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center animate-fade-in pb-24 relative">
+                     <button onClick={cancelSession} className="absolute top-6 left-6 text-slate-400 hover:text-white"><Icon name="x" size={24} /></button>
+                    <div className="bg-slate-800/50 p-6 rounded-2xl w-full max-w-sm border border-slate-700">
+                        <div className="mb-6"><Icon name="settings-2" size={48} className="text-blue-400 mx-auto mb-3" /><h2 className="text-2xl font-bold text-white">Configuration</h2></div>
+                        <div className="mb-8">
+                            <label className="block text-xs text-slate-400 uppercase font-bold mb-3 text-left">Durée échauffement</label>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                {[5, 10, 15].map(min => (<button key={min} onClick={() => setTargetWarmupTime(min * 60)} className={`py-3 rounded-xl font-bold text-sm transition-all ${targetWarmupTime === min * 60 ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{min} min</button>))}
+                                <button onClick={() => setTargetWarmupTime(0)} className={`py-3 rounded-xl font-bold text-sm transition-all ${targetWarmupTime === 0 ? 'bg-slate-600 text-white border-2 border-slate-500' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Aucun</button>
+                            </div>
+                            <div className="text-xs text-right text-slate-500">{targetWarmupTime > 0 ? `Décompte de ${Math.floor(targetWarmupTime/60)} minutes` : "Pas d'échauffement"}</div>
+                        </div>
+                        <Button fullWidth onClick={confirmSetupAndStart} className="bg-green-600 hover:bg-green-500 shadow-green-900/50 text-lg py-4">C'est parti !</Button>
+                    </div>
+                </div>
+            );
+
+            const renderWarmup = () => (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center animate-fade-in pb-24 relative">
+                    <button onClick={cancelSession} className="absolute top-6 left-6 text-slate-400 hover:text-white z-20"><Icon name="x" size={24} /></button>
+                    <div className="bg-orange-500/10 p-6 rounded-full mb-6 relative"><Icon name="flame" size={64} className="text-orange-500" /><div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full animate-pulse"></div></div>
+                    <h2 className="text-3xl font-bold text-white mb-2">Échauffement</h2>
+                    <div className="text-6xl font-mono font-bold text-orange-400 mb-12 tabular-nums">{formatTime(phaseTimer)}</div>
+                    <Button fullWidth onClick={startMainWorkout} className="bg-orange-600 hover:bg-orange-500 shadow-orange-900/50 max-w-sm">Passer à la séance</Button>
+                </div>
+            );
+
+            const renderWorkout = () => (
+                <div className="pb-32 fade-in">
+                    {showVideoFor && <VideoModal exerciseName={showVideoFor} onClose={() => setShowVideoFor(null)} />}
+                    <header className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md py-4 border-b border-slate-800 flex justify-between items-center mb-6">
+                        <button onClick={cancelSession} className="text-slate-400 hover:text-white"><Icon name="x" /></button>
+                        <div className="flex flex-col items-center"><h2 className="font-bold text-sm text-slate-300">{activeRoutine.name}</h2><div className="font-mono text-xl font-bold text-blue-400 tabular-nums leading-none mt-1">{formatTime(sessionDuration)}</div></div>
+                        <button onClick={finishMainWorkout} className="text-green-400 font-semibold text-sm">Terminer</button>
+                    </header>
+                    {isRestTimerRunning && (
+                        <div className="fixed bottom-24 right-4 z-50 flex flex-col items-center gap-2">
+                             <button onClick={(e) => { e.stopPropagation(); addTimeRest(); }} className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-slate-600 transition-transform active:scale-95 flex items-center gap-1"><Icon name="plus" size={12} /> 30s</button>
+                            <div className="bg-slate-800 border-2 border-blue-500 shadow-2xl shadow-blue-900/50 rounded-full w-20 h-20 flex flex-col items-center justify-center cursor-pointer backdrop-blur-md relative overflow-hidden" onClick={() => setIsRestTimerRunning(false)}>
+                                <span className="font-mono font-bold text-2xl text-blue-400">{formatTime(restTimer)}</span><span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-[-2px]">Passer</span>
+                            </div>
+                        </div>
+                    )}
+                    <div className="space-y-8">
+                        {activeRoutine.exercises.map((exerciseEntry, exIndex) => {
+                            const exName = typeof exerciseEntry === 'string' ? exerciseEntry : exerciseEntry.name;
+                            const lastLog = getLastLog(exName);
+                            const videoId = VIDEO_MAPPING[exName];
+                            
+                            return (
+                            <div key={exIndex} className="animate-fade-in">
+                                <div className="flex items-start gap-3 mb-3">
+                                    {/* Video Thumbnail Section */}
+                                    <div 
+                                        className="shrink-0 cursor-pointer relative group overflow-hidden rounded-lg bg-slate-800 border border-slate-700 w-20 h-16 flex items-center justify-center"
+                                        onClick={() => setShowVideoFor(exName)}
+                                    >
+                                        {videoId ? (
+                                            <img 
+                                                src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`} 
+                                                alt={exName} 
+                                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                            />
+                                        ) : (
+                                            <Icon name="dumbbell" className="text-slate-600" size={24} />
+                                        )}
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition-all">
+                                            <div className="bg-black/50 rounded-full p-1 backdrop-blur-sm">
+                                                <Icon name="play" size={12} className="text-white fill-white" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-start">
+                                            <h3 className="text-blue-400 font-semibold text-sm leading-tight mb-1">
+                                                <span className="text-slate-500 mr-2">#{exIndex + 1}</span>
+                                                {exName}
+                                            </h3>
+                                        </div>
+                                        {lastLog && <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full inline-block">Dernier: {lastLog.weight}kg x {lastLog.reps}</span>}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 pl-2">
+                                    <div className="grid grid-cols-10 gap-2 text-xs text-slate-500 uppercase text-center mb-1 px-2"><div className="col-span-2">Set</div><div className="col-span-3">kg</div><div className="col-span-3">Reps</div><div className="col-span-2"></div></div>
+                                    {workoutData[exName] && workoutData[exName].map((set, setIndex) => (
+                                        <div key={setIndex} className={`grid grid-cols-10 gap-2 items-center bg-slate-800/50 rounded-lg p-2 transition-colors ${set.done ? 'bg-green-900/20 border border-green-900/30' : ''}`}>
+                                            <div className="col-span-2 text-center font-mono text-slate-400">{setIndex + 1}</div>
+                                            <div className="col-span-3"><input type="number" step="any" placeholder="0" value={set.weight} onChange={(e) => updateSet(exName, setIndex, 'weight', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center text-white focus:border-blue-500 outline-none font-bold" /></div>
+                                            <div className="col-span-3"><input type="number" placeholder="0" value={set.reps} onChange={(e) => updateSet(exName, setIndex, 'reps', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center text-white focus:border-blue-500 outline-none" /></div>
+                                            <div className="col-span-2 flex justify-center"><button onClick={() => toggleSetDone(exName, setIndex)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${set.done ? 'bg-green-500 text-slate-900' : 'bg-slate-700 text-slate-400'}`}><Icon name="check" size={16} /></button></div>
+                                        </div>
+                                    ))}
+                                    <Button variant="ghost" className="w-full py-2 text-sm mt-2 border border-dashed border-slate-700" onClick={() => addSet(exName)}>+ Ajouter Série</Button>
+                                </div>
+                            </div>
+                        );})}
+                    </div>
+                    <div className="mt-8 p-4"><Button fullWidth onClick={finishMainWorkout} className="bg-green-600 hover:bg-green-500 shadow-green-900/50">Terminer la séance</Button></div>
+                </div>
+            );
+
+            const renderCooldown = () => (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center animate-fade-in pb-24 relative">
+                    <button onClick={cancelSession} className="absolute top-6 left-6 text-slate-400 hover:text-white z-20"><Icon name="x" size={24} /></button>
+                    <div className="bg-blue-400/10 p-6 rounded-full mb-6"><Icon name="wind" size={64} className="text-blue-400" /></div>
+                    <h2 className="text-3xl font-bold text-white mb-2">Récupération</h2>
+                    <div className="text-6xl font-mono font-bold text-blue-300 mb-8 tabular-nums">{formatTime(phaseTimer)}</div>
+                    <div className="grid grid-cols-2 gap-4 w-full max-w-sm mb-8">
+                        <div className="bg-slate-800 p-4 rounded-xl"><div className="text-xs text-slate-500 uppercase font-bold mb-1">Durée</div><div className="text-xl font-bold text-white">{formatDuration(sessionDuration)}</div></div>
+                        <div className="bg-slate-800 p-4 rounded-xl"><div className="text-xs text-slate-500 uppercase font-bold mb-1">Volume</div><div className="text-xl font-bold text-green-400">{Math.round(calculateVolume(workoutData))} kg</div></div>
+                    </div>
+                    <Button fullWidth onClick={saveAndExit} className="bg-green-600 hover:bg-green-500 shadow-green-900/50 max-w-sm">Enregistrer et Quitter</Button>
+                </div>
+            );
+
+            const renderHistory = () => (
+                <div className="space-y-6 pb-24 fade-in">
+                     <header className="mb-6"><h1 className="text-2xl font-bold text-white">Historique</h1></header>
+                    {history.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500"><Icon name="calendar-x" size={48} className="mx-auto mb-4 opacity-50" /><p>Aucune séance enregistrée.</p></div>
+                    ) : (
+                        <div className="space-y-4">
+                            {history.map((session, idx) => (
+                                <Card key={idx}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-white">{session.routineName}</h3>
+                                                <button onClick={(e) => requestDeleteHistory(e, idx)} className="text-slate-600 hover:text-red-400 p-1"><Icon name="trash-2" size={14} /></button>
+                                            </div>
+                                            <p className="text-xs text-slate-400">{new Date(session.date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="bg-slate-700 px-2 py-1 rounded text-xs font-mono text-blue-300 inline-block mb-1">{Math.round(session.totalVolume)} kg</div>
+                                            {session.durationSeconds > 0 && <div className="text-xs text-slate-500">⏱ {formatDuration(session.durationSeconds)}</div>}
+                                        </div>
+                                    </div>
+                                    <div className="text-sm text-slate-400 border-t border-slate-700/50 pt-2 mt-2">{Object.keys(session.exercises).length} exercices complétés</div>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+
+            const NavBar = () => (
+                <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-slate-800 pb-safe pt-2 px-6">
+                    <div className="flex justify-around items-center h-16 max-w-md mx-auto">
+                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center gap-1 transition-colors ${view === 'dashboard' ? 'text-blue-500' : 'text-slate-500'}`}><Icon name="layout-dashboard" /><span className="text-[10px] font-medium">Accueil</span></button>
+                        <div className="relative -top-6">
+                            <button onClick={() => { if(['workout', 'warmup', 'cooldown', 'setup'].includes(view)) return; if(activeRoutine) setView('workout'); }} className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-900/40 border-4 border-slate-900 transition-transform active:scale-95 ${['workout', 'warmup', 'cooldown', 'setup'].includes(view) ? 'bg-green-500 text-slate-900' : 'bg-blue-600 text-white'}`}><Icon name="dumbbell" size={24} /></button>
+                        </div>
+                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-colors ${view === 'history' ? 'text-blue-500' : 'text-slate-500'}`}><Icon name="history" /><span className="text-[10px] font-medium">Historique</span></button>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen max-w-md mx-auto bg-slate-900 p-4 pb-0 relative">
+                    <InstallPrompt />
+                    {/* Confirmation Modal */}
+                    <ConfirmationModal 
+                        isOpen={confirmModal.isOpen} 
+                        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })} 
+                        onConfirm={handleConfirmDelete}
+                        title={confirmModal.title}
+                        message={confirmModal.message}
+                    />
+                    
+                    {view === 'dashboard' && renderDashboard()}
+                    {view === 'create' && renderCreateRoutine()}
+                    {view === 'setup' && renderSessionSetup()}
+                    {view === 'warmup' && renderWarmup()}
+                    {view === 'workout' && renderWorkout()}
+                    {view === 'cooldown' && renderCooldown()}
+                    {view === 'history' && renderHistory()}
+                    {!['workout', 'warmup', 'cooldown', 'setup'].includes(view) && <NavBar />}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
