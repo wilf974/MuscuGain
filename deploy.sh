@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Script de déploiement pour MuscuGain sur VPS Docker
+# Script de déploiement pour MuscuGain sur VPS Docker (intégration avec reverse proxy existant)
 
 set -e
 
-echo "🚀 Déploiement de MuscuGain en Docker avec HTTPS"
-echo "=================================================="
+echo "🚀 Déploiement de MuscuGain en Docker"
+echo "====================================="
 
 # Vérifier que le fichier MuscuGain.html existe
 if [ ! -f "MuscuGain.html" ]; then
@@ -13,74 +13,48 @@ if [ ! -f "MuscuGain.html" ]; then
     exit 1
 fi
 
-# Créer les répertoires nécessaires
-echo "📁 Création des répertoires..."
-mkdir -p letsencrypt certbot-webroot conf.d
-
-# Arrêter les services existants si nécessaire
+# Arrêter le conteneur existant si nécessaire
 echo "⏹️  Arrêt des services existants (s'ils existent)..."
 docker-compose down --remove-orphans 2>/dev/null || true
 
-# Créer les répertoires avec les bonnes permissions
-chmod 755 letsencrypt certbot-webroot conf.d
+# Attendre un peu après l'arrêt
+sleep 2
 
 # Construire l'image Docker
 echo "🔨 Construction de l'image Docker MuscuGain..."
-docker-compose build --no-cache
+docker-compose build
 
 # Démarrer l'application MuscuGain
 echo "🚀 Démarrage de l'application MuscuGain..."
 docker-compose up -d muscugain
 
-# Attendre que MuscuGain soit prêt
-echo "⏳ Attente du démarrage de MuscuGain..."
-sleep 10
-
-# Démarrer Nginx reverse proxy
-echo "🐳 Démarrage du reverse proxy Nginx..."
-docker-compose up -d nginx-proxy
-
-# Attendre que Nginx soit prêt
-echo "⏳ Attente du démarrage de Nginx..."
-sleep 5
-
-# Démarrer Certbot
-echo "🤖 Démarrage de Certbot..."
-docker-compose up -d certbot
-
-# Attendre un peu que certbot soit actif
-sleep 5
-
-# Générer le certificat Let's Encrypt
-echo "🔒 Génération du certificat SSL Let's Encrypt pour muscugain.woutils.com..."
-docker-compose exec -T certbot certbot certonly \
-    --webroot \
-    -w /var/www/certbot \
-    --email admin@woutils.com \
-    --agree-tos \
-    --no-eff-email \
-    --force-renewal \
-    -d muscugain.woutils.com 2>/dev/null || true
-
-# Redémarrer Nginx pour charger les certificats
-echo "🔄 Redémarrage de Nginx avec les certificats..."
-docker-compose restart nginx-proxy
-
-# Attendre le redémarrage
+# Vérifier le status
 sleep 3
+echo ""
+echo "📊 État des services:"
+docker-compose ps
 
 echo ""
 echo "✅ Déploiement terminé avec succès!"
-echo "=================================================="
-echo "🌐 Votre application est disponible à: https://muscugain.woutils.com"
+echo "====================================="
+echo "📌 Application interne: http://muscugain-app:80"
+echo "🌐 Application publique: https://muscugain.woutils.com"
 echo ""
-echo "📝 Prochaines étapes:"
-echo "1. Vérifiez que votre application est accessible"
-echo "2. Pour ajouter d'autres projets, créez des fichiers conf.d/*.conf"
-echo "3. Les certificats SSL se renouvellent automatiquement"
+echo "📝 Configuration du reverse proxy existant:"
+echo "Ajouter cette configuration au reverse proxy Nginx du VPS:"
+echo ""
+echo "  server_name muscugain.woutils.com;"
+echo "  location / {"
+echo "    proxy_pass http://muscugain-app:80;"
+echo "    proxy_set_header Host \$host;"
+echo "    proxy_set_header X-Real-IP \$remote_addr;"
+echo "    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
+echo "    proxy_set_header X-Forwarded-Proto \$scheme;"
+echo "  }"
 echo ""
 echo "📊 Commandes utiles:"
-echo "  - docker-compose logs -f          (voir les logs)"
-echo "  - docker-compose restart          (redémarrer les services)"
-echo "  - docker-compose down             (arrêter et supprimer les conteneurs)"
+echo "  - docker-compose ps              (voir l'état)"
+echo "  - docker-compose logs -f         (voir les logs)"
+echo "  - docker-compose restart         (redémarrer)"
+echo "  - docker-compose down            (arrêter)"
 echo ""

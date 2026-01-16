@@ -1,14 +1,14 @@
 version: '3.8'
 
 services:
-  # Application MuscuGain
+  # Application MuscuGain - expose uniquement en interne
   muscugain:
     build: .
     container_name: muscugain-app
     expose:
       - 80
     networks:
-      - web-network
+      - vps-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
@@ -17,48 +17,8 @@ services:
       retries: 3
       start_period: 10s
 
-  # Reverse Proxy Nginx
-  nginx-proxy:
-    image: nginx:alpine
-    container_name: nginx-reverse-proxy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx-proxy.conf:/etc/nginx/nginx.conf:ro
-      - ./conf.d:/etc/nginx/conf.d:ro
-      - ./ssl:/etc/nginx/ssl:ro
-      - ./letsencrypt:/etc/letsencrypt:ro
-      - ./certbot-webroot:/var/www/certbot:ro
-      - /var/log/nginx:/var/log/nginx
-    networks:
-      - web-network
-    depends_on:
-      - muscugain
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-
-  # Certbot pour gérer les certificats Let's Encrypt
-  certbot:
-    image: certbot/certbot:latest
-    container_name: certbot-manager
-    volumes:
-      - ./letsencrypt:/etc/letsencrypt
-      - ./certbot-webroot:/var/www/certbot
-    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
-    networks:
-      - web-network
-    restart: unless-stopped
-
 networks:
-  web-network:
-    driver: bridge
-
-volumes:
-  letsencrypt:
-  nginx-conf:
+  # Connecté au réseau du reverse proxy existant du VPS
+  vps-network:
+    external: true
+    name: vps-network
