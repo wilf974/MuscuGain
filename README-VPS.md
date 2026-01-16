@@ -13,7 +13,7 @@ Nginx Reverse Proxy existant du VPS
     └─→ autre.woutils.com → Autre service
 ```
 
-MuscuGain s'exécute comme un simple conteneur Nginx sans exposer de ports au host. Le reverse proxy existant route le trafic HTTPS vers MuscuGain via le réseau Docker interne.
+MuscuGain s'exécute comme un conteneur Nginx exposé sur `127.0.0.1:8080`. Le reverse proxy existant route le trafic HTTPS vers MuscuGain via ce port local.
 
 ## Prérequis
 
@@ -42,39 +42,34 @@ Une fois le déploiement terminé, vous devez ajouter une configuration pour Mus
 **Fichier à créer:** `muscugain-upstream.conf` (ou dans sites-available)
 
 ```nginx
-# Configuration pour MuscuGain en amont
-upstream muscugain_backend {
-    server muscugain-app:80;
+# Redirection HTTP → HTTPS
+server {
+    listen 80;
+    server_name muscugain.woutils.com;
+    return 301 https://$server_name$request_uri;
 }
 
+# Configuration HTTPS pour MuscuGain
 server {
     listen 443 ssl http2;
     server_name muscugain.woutils.com;
 
-    # ===== CERTIFICATS SSL (à adapter si nécessaire) =====
+    # Certificats SSL Let's Encrypt
     ssl_certificate /etc/letsencrypt/live/muscugain.woutils.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/muscugain.woutils.com/privkey.pem;
-
-    # Configuration SSL commune
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
 
     # Headers de sécurité
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
 
     # Logs
     access_log /var/log/nginx/muscugain_access.log;
-    error_log /var/log/nginx/muscugain_error.log;
+    error_log /var/log/nginx/muscugain_error.log warn;
 
-    # Proxy vers MuscuGain Docker
+    # Proxy vers le conteneur Docker MuscuGain (exposé sur localhost:8080)
     location / {
-        proxy_pass http://muscugain_backend;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -83,13 +78,6 @@ server {
         proxy_set_header X-Forwarded-Host $server_name;
         proxy_cache_bypass $http_upgrade;
     }
-}
-
-# Redirection HTTP → HTTPS
-server {
-    listen 80;
-    server_name muscugain.woutils.com;
-    return 301 https://$server_name$request_uri;
 }
 ```
 
@@ -204,11 +192,12 @@ sudo tail -f /var/log/nginx/muscugain_error.log
 
 ## Notes importantes
 
-- ⚠️ Le conteneur MuscuGain est sur le réseau Docker interne `vps-network` uniquement
+- ✅ Le conteneur MuscuGain est exposé sur `127.0.0.1:8080` (localhost uniquement, pas accessible depuis Internet)
 - ✅ Le reverse proxy existant gère tous les certificats SSL
 - 🔒 Les autres projets ne sont pas affectés
 - 📊 Les logs du reverse proxy sont sur le host VPS
 - 🔄 Les certificats Let's Encrypt sont gérés par le reverse proxy existant
+- 🐳 Le conteneur est isolé en réseau Docker mais exposé via un port local
 
 ## Support
 

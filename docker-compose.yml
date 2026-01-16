@@ -1,12 +1,14 @@
 version: '3.8'
 
 services:
-  # Application MuscuGain - expose uniquement en interne
+  # Application MuscuGain
   muscugain:
     build: .
     container_name: muscugain-app
     expose:
       - 80
+    ports:
+      - "127.0.0.1:8080:80"
     networks:
       - vps-network
     restart: unless-stopped

@@ -33,9 +33,9 @@ server {
     access_log /var/log/nginx/muscugain_access.log;
     error_log /var/log/nginx/muscugain_error.log warn;
 
-    # Proxy vers le conteneur Docker MuscuGain
+    # Proxy vers le conteneur Docker MuscuGain (exposé sur localhost:8080)
     location / {
-        proxy_pass http://muscugain-app:80;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
 
         # Headers proxy
