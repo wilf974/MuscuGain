@@ -1,0 +1,13 @@
+.git
+.gitignore
+README.md
+.env
+.env.local
+node_modules
+dist
+build
+.DS_Store
+*.log
+letsencrypt
+ssl
+conf.d
