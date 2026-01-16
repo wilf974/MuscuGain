@@ -28,32 +28,46 @@ chmod 755 letsencrypt certbot-webroot conf.d
 echo "🔨 Construction de l'image Docker MuscuGain..."
 docker-compose build --no-cache
 
-# Démarrer Nginx et Certbot
-echo "🐳 Démarrage des services Docker..."
-docker-compose up -d nginx-proxy certbot
+# Démarrer l'application MuscuGain
+echo "🚀 Démarrage de l'application MuscuGain..."
+docker-compose up -d muscugain
+
+# Attendre que MuscuGain soit prêt
+echo "⏳ Attente du démarrage de MuscuGain..."
+sleep 10
+
+# Démarrer Nginx reverse proxy
+echo "🐳 Démarrage du reverse proxy Nginx..."
+docker-compose up -d nginx-proxy
 
 # Attendre que Nginx soit prêt
 echo "⏳ Attente du démarrage de Nginx..."
 sleep 5
 
+# Démarrer Certbot
+echo "🤖 Démarrage de Certbot..."
+docker-compose up -d certbot
+
+# Attendre un peu que certbot soit actif
+sleep 5
+
 # Générer le certificat Let's Encrypt
 echo "🔒 Génération du certificat SSL Let's Encrypt pour muscugain.woutils.com..."
-docker-compose run --rm certbot certonly \
+docker-compose exec -T certbot certbot certonly \
     --webroot \
     -w /var/www/certbot \
     --email admin@woutils.com \
     --agree-tos \
     --no-eff-email \
     --force-renewal \
-    -d muscugain.woutils.com
+    -d muscugain.woutils.com 2>/dev/null || true
 
 # Redémarrer Nginx pour charger les certificats
 echo "🔄 Redémarrage de Nginx avec les certificats..."
 docker-compose restart nginx-proxy
 
-# Démarrer l'application MuscuGain
-echo "🚀 Démarrage de l'application MuscuGain..."
-docker-compose up -d muscugain
+# Attendre le redémarrage
+sleep 3
 
 echo ""
 echo "✅ Déploiement terminé avec succès!"
