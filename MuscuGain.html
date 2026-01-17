@@ -699,8 +699,7 @@
             };
 
             // Replace native confirm with Modal trigger
-            const requestDeleteRoutine = (e, id) => {
-                e.stopPropagation();
+            const requestDeleteRoutine = (id) => {
                 setConfirmModal({
                     isOpen: true,
                     type: 'routine',
@@ -710,8 +709,7 @@
                 });
             };
 
-            const requestDeleteHistory = (e, index) => {
-                e.stopPropagation();
+            const requestDeleteHistory = (index) => {
                 setConfirmModal({
                     isOpen: true,
                     type: 'history',
@@ -1008,7 +1006,7 @@
                                 {customRoutines.map(routine => (
                                     <Card key={routine.id} className="relative overflow-hidden group border-blue-500/30 bg-slate-800/80">
                                         <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-400"><Icon name="user" size={60} /></div>
-                                        <div className="flex justify-between items-start mb-2"><h3 className="text-xl font-bold text-white">{routine.name}</h3><button onClick={(e) => requestDeleteRoutine(e, routine.id)} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors p-2 rounded-lg active:scale-95"><Icon name="trash-2" size={18} /></button></div>
+                                        <div className="flex justify-between items-start mb-2"><h3 className="text-xl font-bold text-white">{routine.name}</h3><button type="button" onClick={() => requestDeleteRoutine(routine.id)} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors p-2 rounded-lg active:scale-95 cursor-pointer"><Icon name="trash-2" size={18} /></button></div>
                                         <p className="text-slate-400 text-sm mb-4 line-clamp-1">{routine.exercises.length} exercices • Personnalisé</p>
                                         <Button fullWidth onClick={() => triggerSetup(routine)} className="bg-slate-700 hover:bg-blue-600 transition-colors">Commencer <Icon name="play" size={16} /></Button>
                                     </Card>
@@ -1159,7 +1157,7 @@
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                                 <h3 className="font-bold text-white">{session.routineName}</h3>
-                                                <button onClick={(e) => requestDeleteHistory(e, idx)} className="text-slate-600 hover:text-red-400 p-1"><Icon name="trash-2" size={14} /></button>
+                                                <button type="button" onClick={() => requestDeleteHistory(idx)} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors"><Icon name="trash-2" size={14} /></button>
                                             </div>
                                             <p className="text-xs text-slate-400">{new Date(session.date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                                         </div>
