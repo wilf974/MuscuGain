@@ -700,6 +700,7 @@
 
             // Replace native confirm with Modal trigger
             const requestDeleteRoutine = (id) => {
+                console.log('Delete routine clicked:', id);
                 setConfirmModal({
                     isOpen: true,
                     type: 'routine',
@@ -710,6 +711,7 @@
             };
 
             const requestDeleteHistory = (index) => {
+                console.log('Delete history clicked:', index);
                 setConfirmModal({
                     isOpen: true,
                     type: 'history',
