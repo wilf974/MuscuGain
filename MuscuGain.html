@@ -1008,7 +1008,7 @@
                                 {customRoutines.map(routine => (
                                     <Card key={routine.id} className="relative overflow-hidden group border-blue-500/30 bg-slate-800/80">
                                         <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-400"><Icon name="user" size={60} /></div>
-                                        <div className="flex justify-between items-start mb-2"><h3 className="text-xl font-bold text-white">{routine.name}</h3><button onClick={(e) => requestDeleteRoutine(e, routine.id)} className="text-slate-600 hover:text-red-400 transition-colors p-1"><Icon name="trash-2" size={16} /></button></div>
+                                        <div className="flex justify-between items-start mb-2"><h3 className="text-xl font-bold text-white">{routine.name}</h3><button onClick={(e) => requestDeleteRoutine(e, routine.id)} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors p-2 rounded-lg active:scale-95"><Icon name="trash-2" size={18} /></button></div>
                                         <p className="text-slate-400 text-sm mb-4 line-clamp-1">{routine.exercises.length} exercices • Personnalisé</p>
                                         <Button fullWidth onClick={() => triggerSetup(routine)} className="bg-slate-700 hover:bg-blue-600 transition-colors">Commencer <Icon name="play" size={16} /></Button>
                                     </Card>
