@@ -658,7 +658,7 @@
                 if (existingIndex >= 0) {
                     setNewRoutineExercises(newRoutineExercises.filter((_, idx) => idx !== existingIndex));
                 } else {
-                    setNewRoutineExercises([...newRoutineExercises, { name: exerciseName, targetSets: 4 }]);
+                    setNewRoutineExercises([...newRoutineExercises, { name: exerciseName, targetSets: 4, targetReps: 8, startingWeight: '' }]);
                 }
             };
 
@@ -670,15 +670,36 @@
                 setNewRoutineExercises(updated);
             };
 
+            const updateExerciseReps = (exerciseName, newReps) => {
+                const updated = newRoutineExercises.map(ex => {
+                    if (ex.name === exerciseName) return { ...ex, targetReps: Math.max(1, newReps) };
+                    return ex;
+                });
+                setNewRoutineExercises(updated);
+            };
+
+            const updateExerciseWeight = (exerciseName, newWeight) => {
+                const updated = newRoutineExercises.map(ex => {
+                    if (ex.name === exerciseName) return { ...ex, startingWeight: newWeight };
+                    return ex;
+                });
+                setNewRoutineExercises(updated);
+            };
+
             const triggerSetup = (routine) => {
                 const initialData = {};
                 routine.exercises.forEach(exEntry => {
                     const exName = typeof exEntry === 'string' ? exEntry : exEntry.name;
                     const targetSets = typeof exEntry === 'string' ? 4 : (exEntry.targetSets || 4);
-                    const lastLog = getLastLog(exName);
+                    const targetReps = typeof exEntry === 'string' ? 8 : (exEntry.targetReps || 8);
+                    const startingWeight = typeof exEntry === 'string' ? '' : (exEntry.startingWeight || '');
+
+                    // Use starting weight from program, or fall back to last log
+                    const weight = startingWeight || (getLastLog(exName) ? getLastLog(exName).weight : '');
+
                     initialData[exName] = [];
                     for(let i = 0; i < targetSets; i++) {
-                        initialData[exName].push({ weight: lastLog ? lastLog.weight : '', reps: '', done: false });
+                        initialData[exName].push({ weight: weight, reps: targetReps, done: false });
                     }
                 });
                 setWorkoutData(initialData);
@@ -814,15 +835,27 @@
                                 {newRoutineExercises.length > 0 && <button onClick={() => setNewRoutineExercises([])} className="text-xs text-red-400 hover:text-red-300">Tout effacer</button>}
                             </div>
                             {newRoutineExercises.length > 0 ? (
-                                <div className="bg-slate-800 rounded-xl p-2 space-y-1">
+                                <div className="bg-slate-800 rounded-xl p-2 space-y-2">
                                     {newRoutineExercises.map((exObj, idx) => (
-                                        <div key={idx} className="flex justify-between items-center bg-slate-700/50 p-3 rounded-lg">
-                                            <span className="text-sm font-medium flex-1 truncate mr-2">{exObj.name}</span>
-                                            <div className="flex items-center gap-2 mr-3">
-                                                <span className="text-xs text-slate-400">Séries:</span>
-                                                <input type="number" value={exObj.targetSets} onChange={(e) => updateExerciseSets(exObj.name, parseInt(e.target.value))} className="w-12 bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                        <div key={idx} className="bg-slate-700/50 p-3 rounded-lg space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-medium flex-1 truncate">{exObj.name}</span>
+                                                <button onClick={() => toggleExerciseSelection(exObj.name)} className="text-slate-400 hover:text-red-400"><Icon name="x" size={16} /></button>
                                             </div>
-                                            <button onClick={() => toggleExerciseSelection(exObj.name)} className="text-slate-400 hover:text-red-400"><Icon name="x" size={16} /></button>
+                                            <div className="grid grid-cols-3 gap-2 text-xs">
+                                                <div>
+                                                    <label className="text-slate-500">Séries</label>
+                                                    <input type="number" value={exObj.targetSets} onChange={(e) => updateExerciseSets(exObj.name, parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-slate-500">Reps</label>
+                                                    <input type="number" value={exObj.targetReps || 8} onChange={(e) => updateExerciseReps(exObj.name, parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-slate-500">Poids (kg)</label>
+                                                    <input type="number" step="any" value={exObj.startingWeight || ''} onChange={(e) => updateExerciseWeight(exObj.name, e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
