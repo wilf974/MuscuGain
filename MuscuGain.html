@@ -739,13 +739,13 @@
                 if (existingIndex >= 0) {
                     setNewRoutineExercises(newRoutineExercises.filter((_, idx) => idx !== existingIndex));
                 } else {
-                    setNewRoutineExercises([...newRoutineExercises, { name: exerciseName, targetSets: 0, targetReps: 0, startingWeight: '' }]);
+                    setNewRoutineExercises([...newRoutineExercises, { name: exerciseName, targetSets: '', targetReps: '', startingWeight: '' }]);
                 }
             };
 
             const updateExerciseSets = (exerciseName, newSets) => {
                 const updated = newRoutineExercises.map(ex => {
-                    if (ex.name === exerciseName) return { ...ex, targetSets: Math.max(1, newSets) };
+                    if (ex.name === exerciseName) return { ...ex, targetSets: newSets === '' ? '' : Math.max(1, parseInt(newSets) || 1) };
                     return ex;
                 });
                 setNewRoutineExercises(updated);
@@ -753,7 +753,7 @@
 
             const updateExerciseReps = (exerciseName, newReps) => {
                 const updated = newRoutineExercises.map(ex => {
-                    if (ex.name === exerciseName) return { ...ex, targetReps: Math.max(1, newReps) };
+                    if (ex.name === exerciseName) return { ...ex, targetReps: newReps === '' ? '' : Math.max(1, parseInt(newReps) || 1) };
                     return ex;
                 });
                 setNewRoutineExercises(updated);
@@ -771,8 +771,8 @@
                 const initialData = {};
                 routine.exercises.forEach(exEntry => {
                     const exName = typeof exEntry === 'string' ? exEntry : exEntry.name;
-                    const targetSets = typeof exEntry === 'string' ? 4 : (exEntry.targetSets || 4);
-                    const targetReps = typeof exEntry === 'string' ? 8 : (exEntry.targetReps || 8);
+                    const targetSets = typeof exEntry === 'string' ? 4 : (parseInt(exEntry.targetSets) || 4);
+                    const targetReps = typeof exEntry === 'string' ? 8 : (parseInt(exEntry.targetReps) || 8);
                     const startingWeight = typeof exEntry === 'string' ? '' : (exEntry.startingWeight || '');
 
                     // Use starting weight from program, or fall back to last log
@@ -926,15 +926,15 @@
                                             <div className="grid grid-cols-3 gap-2 text-xs">
                                                 <div>
                                                     <label className="text-slate-500">Séries</label>
-                                                    <input type="number" value={exObj.targetSets} onChange={(e) => updateExerciseSets(exObj.name, parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                                    <input type="number" value={exObj.targetSets} onChange={(e) => updateExerciseSets(exObj.name, e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
                                                 </div>
                                                 <div>
                                                     <label className="text-slate-500">Reps</label>
-                                                    <input type="number" value={exObj.targetReps || 8} onChange={(e) => updateExerciseReps(exObj.name, parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                                    <input type="number" value={exObj.targetReps} onChange={(e) => updateExerciseReps(exObj.name, e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
                                                 </div>
                                                 <div>
                                                     <label className="text-slate-500">Poids (kg)</label>
-                                                    <input type="number" step="any" value={exObj.startingWeight || ''} onChange={(e) => updateExerciseWeight(exObj.name, e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                                                    <input type="number" step="any" value={exObj.startingWeight} onChange={(e) => updateExerciseWeight(exObj.name, e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
                                                 </div>
                                             </div>
                                         </div>
