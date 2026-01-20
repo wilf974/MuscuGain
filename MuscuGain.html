@@ -542,7 +542,8 @@
             const [history, setHistory] = useState([]);
             const [customRoutines, setCustomRoutines] = useState([]);
             const [showVideoFor, setShowVideoFor] = useState(null);
-            
+            const [lastFinishedSession, setLastFinishedSession] = useState(null);
+
             // Confirmation Modal State
             const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, id: null, title: '', message: '' });
 
@@ -595,6 +596,15 @@
                         }
                     } catch (e) {
                         localStorage.removeItem('muscuGainActiveSession');
+                    }
+                }
+
+                const savedLastSession = localStorage.getItem('muscuGainLastFinishedSession');
+                if (savedLastSession) {
+                    try {
+                        setLastFinishedSession(JSON.parse(savedLastSession));
+                    } catch (e) {
+                        localStorage.removeItem('muscuGainLastFinishedSession');
                     }
                 }
             }, []);
@@ -835,6 +845,23 @@
                 const newHistory = [newEntry, ...history];
                 setHistory(newHistory);
                 localStorage.setItem('muscuGainHistory', JSON.stringify(newHistory));
+
+                // Store last finished session for potential resume within 2 hours
+                const lastSession = {
+                    finishedAt: Date.now(),
+                    activeRoutine: activeRoutine,
+                    workoutData: workoutData,
+                    sessionStartTime: sessionStartTime,
+                    phaseStartTime: phaseStartTime,
+                    phaseInitialDuration: phaseInitialDuration,
+                    restStartTime: restStartTime,
+                    restInitialDuration: restInitialDuration,
+                    isRestTimerRunning: isRestTimerRunning,
+                    targetWarmupTime: targetWarmupTime
+                };
+                setLastFinishedSession(lastSession);
+                localStorage.setItem('muscuGainLastFinishedSession', JSON.stringify(lastSession));
+
                 localStorage.removeItem('muscuGainActiveSession');
                 setView('dashboard');
                 setActiveRoutine(null);
@@ -977,6 +1004,30 @@
                 </div>
             );
 
+            // --- Resume Session Feature ---
+            const canResumeSession = () => {
+                if (!lastFinishedSession) return false;
+                const timeSinceFinish = Date.now() - lastFinishedSession.finishedAt;
+                const twoHoursMs = 2 * 60 * 60 * 1000;
+                return timeSinceFinish < twoHoursMs;
+            };
+
+            const resumeLastSession = () => {
+                if (!canResumeSession()) return;
+                const session = lastFinishedSession;
+                setActiveRoutine(session.activeRoutine);
+                setWorkoutData(session.workoutData);
+                setSessionStartTime(session.sessionStartTime);
+                setPhaseStartTime(session.phaseStartTime);
+                setPhaseInitialDuration(session.phaseInitialDuration);
+                setRestStartTime(session.restStartTime);
+                setRestInitialDuration(session.restInitialDuration);
+                setIsRestTimerRunning(session.isRestTimerRunning);
+                setTargetWarmupTime(session.targetWarmupTime || 600);
+                setView('workout');
+                // Don't clear lastFinishedSession yet - user might want to resume multiple times
+            };
+
             const renderDashboard = () => (
                 <div className="space-y-6 pb-24 fade-in">
                     <header className="flex justify-between items-center mb-6">
@@ -991,6 +1042,12 @@
                          <div className="bg-blue-600/20 border border-blue-500/50 rounded-xl p-4 mb-6 flex justify-between items-center animate-pulse-soft">
                             <div><h3 className="text-blue-400 font-bold">Séance en cours</h3><p className="text-xs text-blue-200">{activeRoutine.name}</p></div>
                             <Button onClick={() => setView('workout')} className="py-2 text-xs">Reprendre</Button>
+                        </div>
+                    )}
+                    {!activeRoutine && canResumeSession() && (
+                         <div className="bg-amber-600/20 border border-amber-500/50 rounded-xl p-4 mb-6 flex justify-between items-center animate-pulse-soft">
+                            <div><h3 className="text-amber-400 font-bold">Séance à reprendre</h3><p className="text-xs text-amber-200">{lastFinishedSession?.activeRoutine?.name}</p></div>
+                            <Button onClick={resumeLastSession} className="py-2 text-xs bg-amber-600 hover:bg-amber-500">Reprendre</Button>
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-4">
