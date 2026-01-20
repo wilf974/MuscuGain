@@ -852,6 +852,7 @@
                     activeRoutine: activeRoutine,
                     workoutData: workoutData,
                     sessionStartTime: sessionStartTime,
+                    sessionDuration: sessionDuration,
                     phaseStartTime: phaseStartTime,
                     phaseInitialDuration: phaseInitialDuration,
                     restStartTime: restStartTime,
@@ -1018,6 +1019,7 @@
                 setActiveRoutine(session.activeRoutine);
                 setWorkoutData(session.workoutData);
                 setSessionStartTime(session.sessionStartTime);
+                setSessionDuration(session.sessionDuration || 0);
                 setPhaseStartTime(session.phaseStartTime);
                 setPhaseInitialDuration(session.phaseInitialDuration);
                 setRestStartTime(session.restStartTime);
