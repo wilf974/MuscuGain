@@ -1128,7 +1128,7 @@
                     <header className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md py-4 border-b border-slate-800 flex justify-between items-center mb-6">
                         <button onClick={cancelSession} className="text-slate-400 hover:text-white"><Icon name="x" /></button>
                         <div className="flex flex-col items-center"><h2 className="font-bold text-sm text-slate-300">{activeRoutine.name}</h2><div className="font-mono text-xl font-bold text-blue-400 tabular-nums leading-none mt-1">{formatTime(sessionDuration)}</div></div>
-                        <button onClick={finishMainWorkout} className="text-green-400 font-semibold text-sm">Terminer</button>
+                        <div className="w-6"></div>
                     </header>
                     {isRestTimerRunning && (
                         <div className="fixed bottom-24 right-4 z-50 flex flex-col items-center gap-2">
