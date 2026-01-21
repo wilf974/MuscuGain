@@ -1131,10 +1131,10 @@
                         <div className="w-6"></div>
                     </header>
                     {isRestTimerRunning && (
-                        <div className="fixed bottom-24 right-4 z-50 flex flex-col items-center gap-2">
-                             <button onClick={(e) => { e.stopPropagation(); addTimeRest(); }} className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-slate-600 transition-transform active:scale-95 flex items-center gap-1"><Icon name="plus" size={12} /> 30s</button>
-                            <div className="bg-slate-800 border-2 border-blue-500 shadow-2xl shadow-blue-900/50 rounded-full w-20 h-20 flex flex-col items-center justify-center cursor-pointer backdrop-blur-md relative overflow-hidden" onClick={() => setIsRestTimerRunning(false)}>
-                                <span className="font-mono font-bold text-2xl text-blue-400">{formatTime(restTimer)}</span><span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-[-2px]">Passer</span>
+                        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-slate-900/40 backdrop-blur-sm">
+                            <button onClick={(e) => { e.stopPropagation(); addTimeRest(); }} className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-slate-600 transition-transform active:scale-95 flex items-center gap-1"><Icon name="plus" size={12} /> 30s</button>
+                            <div className="bg-slate-800 border-2 border-blue-500 shadow-2xl shadow-blue-900/50 rounded-full w-32 h-32 flex flex-col items-center justify-center cursor-pointer backdrop-blur-md relative overflow-hidden" onClick={() => setIsRestTimerRunning(false)}>
+                                <span className="font-mono font-bold text-5xl text-blue-400">{formatTime(restTimer)}</span><span className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-2">Passer</span>
                             </div>
                         </div>
                     )}
