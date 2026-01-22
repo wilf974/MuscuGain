@@ -533,6 +533,50 @@
             );
         };
 
+        const AddExerciseModal = ({ isOpen, onClose, onSelect, exerciseDb, existingExercises = [] }) => {
+            if (!isOpen) return null;
+            const existingExerciseNames = existingExercises.map(ex => typeof ex === 'string' ? ex : ex.name);
+            return (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in" onClick={onClose}>
+                    <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4 text-blue-400">
+                            <Icon name="plus-circle" size={24} />
+                            <h3 className="text-xl font-bold text-white">Ajouter un Exercice</h3>
+                        </div>
+                        <div className="space-y-3">
+                            {Object.entries(exerciseDb).map(([category, exercises]) => (
+                                <div key={category}>
+                                    <h4 className="text-sm font-bold text-slate-400 uppercase mb-2">{category}</h4>
+                                    <div className="space-y-1">
+                                        {exercises.map(exerciseName => {
+                                            const isAlreadyAdded = existingExerciseNames.includes(exerciseName);
+                                            return (
+                                                <button
+                                                    key={exerciseName}
+                                                    onClick={() => !isAlreadyAdded && onSelect(exerciseName)}
+                                                    disabled={isAlreadyAdded}
+                                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                                                        isAlreadyAdded
+                                                            ? 'text-slate-500 bg-slate-700/30 cursor-not-allowed'
+                                                            : 'text-slate-200 hover:bg-blue-600/30 hover:text-blue-300 cursor-pointer'
+                                                    }`}
+                                                >
+                                                    {exerciseName} {isAlreadyAdded && <span className="text-xs text-slate-600 ml-2">✓ Ajouté</span>}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-4">
+                            <Button onClick={onClose} variant="ghost" fullWidth>Fermer</Button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- Main App Component ---
 
         const App = () => {
@@ -542,6 +586,7 @@
             const [history, setHistory] = useState([]);
             const [customRoutines, setCustomRoutines] = useState([]);
             const [showVideoFor, setShowVideoFor] = useState(null);
+            const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
             const [lastFinishedSession, setLastFinishedSession] = useState(null);
 
             // Confirmation Modal State
@@ -893,6 +938,27 @@
                 setWorkoutData(newData);
             };
 
+            const addExerciseToSession = (exerciseName) => {
+                const newData = { ...workoutData };
+                if (!newData[exerciseName]) {
+                    newData[exerciseName] = [
+                        { weight: '', reps: '', done: false },
+                        { weight: '', reps: '', done: false },
+                        { weight: '', reps: '', done: false },
+                        { weight: '', reps: '', done: false }
+                    ];
+                    setWorkoutData(newData);
+
+                    // Also add to activeRoutine if not already there
+                    const updatedRoutine = { ...activeRoutine };
+                    if (!updatedRoutine.exercises.includes(exerciseName)) {
+                        updatedRoutine.exercises.push(exerciseName);
+                        setActiveRoutine(updatedRoutine);
+                    }
+                    setShowAddExerciseModal(false);
+                }
+            };
+
             const toggleSetDone = (exercise, index) => {
                 const newData = { ...workoutData };
                 newData[exercise][index].done = !newData[exercise][index].done;
@@ -1125,6 +1191,13 @@
             const renderWorkout = () => (
                 <div className="pb-32 fade-in">
                     {showVideoFor && <VideoModal exerciseName={showVideoFor} onClose={() => setShowVideoFor(null)} />}
+                    <AddExerciseModal
+                        isOpen={showAddExerciseModal}
+                        onClose={() => setShowAddExerciseModal(false)}
+                        onSelect={addExerciseToSession}
+                        exerciseDb={EXERCISES_DB}
+                        existingExercises={activeRoutine?.exercises || []}
+                    />
                     <header className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md py-4 border-b border-slate-800 flex justify-between items-center mb-6">
                         <button onClick={cancelSession} className="text-slate-400 hover:text-white"><Icon name="x" /></button>
                         <div className="flex flex-col items-center"><h2 className="font-bold text-sm text-slate-300">{activeRoutine.name}</h2><div className="font-mono text-xl font-bold text-blue-400 tabular-nums leading-none mt-1">{formatTime(sessionDuration)}</div></div>
@@ -1194,7 +1267,10 @@
                             </div>
                         );})}
                     </div>
-                    <div className="mt-8 p-4"><Button fullWidth onClick={finishMainWorkout} className="bg-green-600 hover:bg-green-500 shadow-green-900/50">Terminer la séance</Button></div>
+                    <div className="mt-8 p-4 space-y-3">
+                        <Button fullWidth onClick={() => setShowAddExerciseModal(true)} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30"><Icon name="plus" size={16} /> Ajouter un Exercice</Button>
+                        <Button fullWidth onClick={finishMainWorkout} className="bg-green-600 hover:bg-green-500 shadow-green-900/50">Terminer la séance</Button>
+                    </div>
                 </div>
             );
 
