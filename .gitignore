@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output (généré par vite build dans le Dockerfile)
+dist/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs / OS
+*.log
+.DS_Store
+
+# Certbot / SSL runtime
+letsencrypt/
+certbot-webroot/

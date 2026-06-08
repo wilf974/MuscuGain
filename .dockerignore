@@ -1,8 +1,13 @@
 .git
 .gitignore
 README.md
+README-DOCKER.md
+README-VPS.md
+HISTORIQUE.MD
+TODO.md
 .env
 .env.local
+.env.example
 node_modules
 dist
 build
@@ -11,3 +16,9 @@ build
 letsencrypt
 ssl
 conf.d
+certbot-webroot
+MuscuGain.html
+nginx.conf
+nginx-proxy.conf
+muscugain-nginx.conf.example
+deploy.sh

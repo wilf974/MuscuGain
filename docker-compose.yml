@@ -1,10 +1,10 @@
-version: '3.8'
-
 services:
   # Application MuscuGain
   muscugain:
     build: .
     container_name: muscugain-app
+    security_opt:
+      - no-new-privileges:true
     expose:
       - 80
     ports:
@@ -13,7 +13,7 @@ services:
       - vps-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s
       timeout: 10s
       retries: 3
