@@ -1,0 +1,14 @@
+{
+  "name": "muscugain-ai",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Passerelle IA vision pour MuscuGain (NVIDIA NIM)",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^10.2.0",
+    "fastify": "^5.2.0"
+  }
+}

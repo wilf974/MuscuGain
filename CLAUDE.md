@@ -1,6 +1,6 @@
 # MuscuGain — CLAUDE.md
 
-App de suivi musculation. **Local-first** (données dans `localStorage`, aucun backend).
+App de suivi musculation. **Local-first** (données dans `localStorage`). Backend optionnel `backend/` : passerelle IA vision pour reconnaître un exercice depuis une photo de machine (aucune donnée utilisateur stockée côté serveur).
 
 ## Stack
 Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (Docker).
@@ -27,6 +27,17 @@ Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (D
 - **1 feuille = 1 programme** nommé d'après la feuille. Colonnes : **A**=exercice (verbatim), **B**=séries, **C**=reps, **D**=pause (minutes → `restSeconds`).
 - Auto-détection ligne d'en-tête (si B et C non numériques sur la 1ère ligne). Conflit de nom → **écrase** l'existant. Aperçu avec cases à cocher avant création.
 - Lib : `read-excel-file@9` (import depuis `read-excel-file/browser`). Logique de parsing pure et testable dans `parseWorkbook.core.js`.
+
+## Backend IA vision (`backend/`)
+- Fastify (ESM, `node server.js`), `POST /recognize-exercise` `{image: dataURL|base64, allowedExercises?: string[]}` → `{label, candidates: [{exercise, confidence}]×3}`. `GET /health`. Rate-limit 30/min, bodyLimit 8MB.
+- Modèle : **`nvidia/nemotron-nano-12b-v2-vl`** (NVIDIA NIM). Choisi par benchmark (cf. HISTORIQUE 09/06) : llama-3.2-90b refuse les photos avec personnes, llama-4-maverick timeout. Surcharge via `NVIDIA_MODEL`.
+- Env : `backend/.env` (`NVIDIA_API_KEY`, `NVIDIA_MODEL`, `PORT=8000`). `.env` non committé (clé).
+- ⚠️ Confidences candidats 2/3 mal calibrées → se fier à l'ordre, pas à la valeur absolue.
+- **Intégré et déployé** : service `muscugain-backend` (compose, `expose:8000`, interne `vps-network`) + nginx `location /api/` (proxy strip, `client_max_body_size 10m`). Front appelle `/api/recognize-exercise` en relatif.
+- Front : `src/utils/recognizeMachine.{core.,}js` (core pur testé + IO canvas/fetch), bouton « 📷 Identifier par photo » dans `AddExerciseModal` (idle/loading/results/error, liste manuelle en fallback).
+
+## Mode séance libre
+- Bouton « Séance libre » sur le Dashboard (`App.startFreeSession`) → routine vide `{name:'Séance libre', exercises:[]}` → flux setup→warmup→workout. Ajout d'exos à la volée (manuel ou photo) pendant la séance. Historisé comme une séance normale (`routineName:'Séance libre'`).
 
 ## Conventions
 - Charte : dark slate-900/800, accent blue-500/600, rounded-xl/2xl, `fade-in`, sémantique amber/green/red. Réutiliser Button/Card.
