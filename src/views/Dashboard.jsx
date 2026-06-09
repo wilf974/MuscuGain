@@ -11,6 +11,7 @@ export default function Dashboard({
   lastFinishedSession,
   setView,
   triggerSetup,
+  startFreeSession,
   requestDeleteRoutine,
   resumeLastSession,
   canResumeSession,
@@ -94,6 +95,13 @@ export default function Dashboard({
           </div>
           <Button onClick={resumeLastSession} className="py-2 text-xs bg-amber-600 hover:bg-amber-500">Reprendre</Button>
         </div>
+      )}
+
+      {/* Séance libre */}
+      {!activeRoutine && (
+        <Button fullWidth onClick={startFreeSession} className="bg-blue-600 hover:bg-blue-500 shadow-blue-900/50">
+          <Play size={16} /> Séance libre
+        </Button>
       )}
 
       {/* Stats */}

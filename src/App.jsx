@@ -170,6 +170,12 @@ export default function App() {
     setView('setup');
   };
 
+  const startFreeSession = () => {
+    setWorkoutData({});
+    setActiveRoutine({ name: 'Séance libre', exercises: [], isCustom: false });
+    setView('setup');
+  };
+
   const cancelSession = () => {
     setCancelModalOpen(true);
   };
@@ -373,6 +379,7 @@ export default function App() {
           lastFinishedSession={lastFinishedSession}
           setView={setView}
           triggerSetup={triggerSetup}
+          startFreeSession={startFreeSession}
           requestDeleteRoutine={requestDeleteRoutine}
           resumeLastSession={resumeLastSession}
           canResumeSession={canResumeSession}
