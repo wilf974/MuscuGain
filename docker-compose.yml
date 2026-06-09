@@ -19,6 +19,18 @@ services:
       retries: 3
       start_period: 10s
 
+  muscugain-backend:
+    build: ./backend
+    container_name: muscugain-backend
+    env_file: backend/.env
+    security_opt:
+      - no-new-privileges:true
+    expose:
+      - 8000
+    networks:
+      - vps-network
+    restart: unless-stopped
+
 networks:
   # Connecté au réseau du reverse proxy existant du VPS
   vps-network:
