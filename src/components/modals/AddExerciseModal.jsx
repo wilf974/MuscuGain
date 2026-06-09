@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
-import { PlusCircle, Camera, Loader2, AlertCircle } from 'lucide-react';
+import { PlusCircle, Camera, Loader2, AlertCircle, Image as ImageIcon } from 'lucide-react';
 import Button from '../ui/Button';
 import { EXERCISES_DB, MUSCLE_LABELS } from '../../data/exercises';
 import { recognizeMachine, flattenExercises, RecognizeError } from '../../utils/recognizeMachine';
 
 export default function AddExerciseModal({ isOpen, onClose, onSelect, existingExercises = [] }) {
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const [phase, setPhase] = useState('idle'); // idle | loading | results | error
   const [result, setResult] = useState(null); // { label, candidates }
   const [errorMsg, setErrorMsg] = useState('');
@@ -55,15 +56,24 @@ export default function AddExerciseModal({ isOpen, onClose, onSelect, existingEx
         </div>
 
         {/* Reconnaissance par photo */}
-        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+        <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
 
         {phase === 'idle' && (
-          <button
-            onClick={() => fileInputRef.current && fileInputRef.current.click()}
-            className="w-full mb-4 flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-bold text-blue-300 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-colors"
-          >
-            <Camera size={18} /> Identifier par photo
-          </button>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <button
+              onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
+              className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-bold text-blue-300 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-colors"
+            >
+              <Camera size={18} /> Photo
+            </button>
+            <button
+              onClick={() => galleryInputRef.current && galleryInputRef.current.click()}
+              className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-bold text-slate-300 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 transition-colors"
+            >
+              <ImageIcon size={18} /> Galerie
+            </button>
+          </div>
         )}
 
         {phase === 'loading' && (
