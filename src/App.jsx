@@ -458,6 +458,7 @@ export default function App() {
           sessionDuration={sessionDuration}
           workoutData={workoutData}
           saveAndExit={saveAndExit}
+          history={history}
         />
       )}
       {view === 'history' && (
