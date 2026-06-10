@@ -81,6 +81,82 @@ app.post('/recognize-exercise', async (req, reply) => {
   return reply.send({ label: parsed.label ?? null, candidates });
 });
 
+app.post('/analyze-body', async (req, reply) => {
+  if (!API_KEY) return reply.code(503).send({ error: 'Clé NVIDIA non configurée' });
+
+  const { image, previousAnalysis } = req.body || {};
+  if (!image || typeof image !== 'string') return reply.code(400).send({ error: 'image manquante' });
+
+  const dataUrl = image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`;
+
+  let prevText = '';
+  if (previousAnalysis && typeof previousAnalysis === 'object') {
+    const p = previousAnalysis;
+    prevText =
+      "\nAnalyse précédente (pour mesurer l'évolution): " +
+      `morphotype=${p.morphotype || '?'}, équilibre=${p.balance || '?'}, ` +
+      `masse grasse=${p.bodyFatRange || '?'}, faiblesses=${(p.weaknesses || []).join('; ') || '?'}. ` +
+      "Compare et résume l'évolution visible dans 'evolutionNote'.";
+  }
+
+  const prompt =
+    "Tu es un coach sportif bienveillant. Voici une photo du corps d'une personne qui suit sa progression en musculation. " +
+    "Analyse la morphologie de façon constructive et NON médicale (aucun diagnostic médical, ce sont des estimations visuelles approximatives). " +
+    "Évalue: le morphotype, l'équilibre/symétrie musculaire, une fourchette approximative de masse grasse (ex '15-18%'), " +
+    "les points forts visibles, les points faibles à travailler, et des conseils d'entraînement concrets. " +
+    "Réponds UNIQUEMENT en JSON, sans texte autour: " +
+    '{"morphotype":"<court>","balance":"<court>","bodyFatRange":"<ex 15-18%>",' +
+    '"strengths":["..."],"weaknesses":["..."],"trainingAdvice":["..."],"evolutionNote":"<vide si pas de précédent>"}.' +
+    prevText;
+
+  const payload = {
+    model: MODEL,
+    messages: [{ role: 'user', content: [
+      { type: 'text', text: prompt },
+      { type: 'image_url', image_url: { url: dataUrl } },
+    ] }],
+    max_tokens: 512,
+    temperature: 0.2,
+  };
+
+  let res;
+  try {
+    res = await fetch(NVIDIA_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000),
+    });
+  } catch (e) {
+    req.log.error({ err: String(e) }, 'NVIDIA fetch failed (body)');
+    return reply.code(504).send({ error: 'Délai dépassé côté modèle' });
+  }
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    req.log.error({ status: res.status, body: t.slice(0, 300) }, 'NVIDIA error (body)');
+    return reply.code(502).send({ error: 'Erreur du modèle', status: res.status });
+  }
+
+  const out = await res.json();
+  const content = out?.choices?.[0]?.message?.content || '';
+  const parsed = extractJson(content);
+  if (!parsed) return reply.send({});
+
+  const str = (v) => (typeof v === 'string' ? v.trim() : '');
+  const arr = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()).slice(0, 6) : []);
+
+  return reply.send({
+    morphotype: str(parsed.morphotype),
+    balance: str(parsed.balance),
+    bodyFatRange: str(parsed.bodyFatRange),
+    strengths: arr(parsed.strengths),
+    weaknesses: arr(parsed.weaknesses),
+    trainingAdvice: arr(parsed.trainingAdvice),
+    evolutionNote: str(parsed.evolutionNote),
+  });
+});
+
 app.listen({ port: PORT, host: '0.0.0.0' })
   .then(() => app.log.info(`muscugain-ai up on :${PORT} (model ${MODEL})`))
   .catch((e) => { app.log.error(e); process.exit(1); });
