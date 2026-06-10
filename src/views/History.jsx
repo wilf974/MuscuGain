@@ -3,6 +3,7 @@ import { CalendarX, Trash2, ChevronDown, ChevronUp, Check, Trophy } from 'lucide
 import Card from '../components/ui/Card';
 import { formatDuration } from '../utils/format';
 import { computePRs } from '../utils/records.core';
+import VolumeChart from '../components/ui/VolumeChart';
 
 export default function History({ history, requestDeleteHistory }) {
   const [expanded, setExpanded] = useState(null);
@@ -13,6 +14,7 @@ export default function History({ history, requestDeleteHistory }) {
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-white">Historique</h1>
       </header>
+      {history.length > 0 && <VolumeChart history={history} />}
       {history.length === 0 ? (
         <div className="text-center py-12 text-slate-500">
           <CalendarX size={48} className="mx-auto mb-4 opacity-50" />
