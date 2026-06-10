@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { CalendarX, Trash2, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { CalendarX, Trash2, ChevronDown, ChevronUp, Check, Trophy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { formatDuration } from '../utils/format';
+import { computePRs } from '../utils/records.core';
 
 export default function History({ history, requestDeleteHistory }) {
   const [expanded, setExpanded] = useState(null);
+  const prs = computePRs(history);
 
   return (
     <div className="space-y-6 pb-24 fade-in">
@@ -59,9 +61,10 @@ export default function History({ history, requestDeleteHistory }) {
                         <div className="space-y-1">
                           {sets.map((set, i) => {
                             const empty = !set.weight;
+                            const isPR = set.done && Number(set.weight) > 0 && Number(set.weight) === prs[exName];
                             return (
                               <div key={i} className={`flex items-center justify-between text-xs ${empty ? 'text-slate-600' : 'text-slate-300'}`}>
-                                <span>Série {i + 1}</span>
+                                <span className="flex items-center gap-1">Série {i + 1}{isPR && <Trophy size={12} className="text-amber-400" />}</span>
                                 <span className="font-mono">{set.weight || '–'} kg × {set.reps || '–'}</span>
                                 {set.done ? <Check size={14} className="text-green-400" /> : <span className="w-3.5" />}
                               </div>
