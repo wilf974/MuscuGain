@@ -5,9 +5,6 @@ import InstallPrompt from './components/InstallPrompt';
 import NavBar from './components/NavBar';
 import ConfirmationModal from './components/modals/ConfirmationModal';
 import ImportRoutineModal from './components/modals/ImportRoutineModal';
-import ImportBackupModal from './components/modals/ImportBackupModal';
-import { downloadBackup } from './utils/backup';
-import { mergeBackup } from './utils/backup.core';
 import Dashboard from './views/Dashboard';
 import CreateRoutine from './views/CreateRoutine';
 import SessionSetup from './views/SessionSetup';
@@ -30,7 +27,6 @@ export default function App() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   // Import routines modal
   const [importModalOpen, setImportModalOpen] = useState(false);
-  const [backupModalOpen, setBackupModalOpen] = useState(false);
 
   // Timer States
   const [sessionStartTime, setSessionStartTime] = useState(null);
@@ -301,18 +297,6 @@ export default function App() {
 
   // --- Import routines (depuis .xlsx) ---
   // incoming: [{ name, exercises }]. Écrase un programme existant de même nom.
-  const exportData = () => {
-    downloadBackup({ history, customRoutines });
-  };
-
-  const importData = (imported) => {
-    const merged = mergeBackup({ history, customRoutines }, imported);
-    setHistory(merged.history);
-    localStorage.setItem('muscuGainHistory', JSON.stringify(merged.history));
-    setCustomRoutines(merged.customRoutines);
-    localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(merged.customRoutines));
-  };
-
   const importRoutines = (incoming) => {
     let updated = [...customRoutines];
     incoming.forEach((r, i) => {
@@ -387,14 +371,6 @@ export default function App() {
         onConfirm={importRoutines}
       />
 
-      {/* Import backup modal */}
-      <ImportBackupModal
-        isOpen={backupModalOpen}
-        onClose={() => setBackupModalOpen(false)}
-        current={{ history, customRoutines }}
-        onConfirm={importData}
-      />
-
       {view === 'dashboard' && (
         <Dashboard
           history={history}
@@ -408,8 +384,6 @@ export default function App() {
           resumeLastSession={resumeLastSession}
           canResumeSession={canResumeSession}
           onImportClick={() => setImportModalOpen(true)}
-          onExportClick={exportData}
-          onBackupImportClick={() => setBackupModalOpen(true)}
         />
       )}
       {view === 'create' && (
