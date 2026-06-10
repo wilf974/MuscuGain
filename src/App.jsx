@@ -7,6 +7,7 @@ import ConfirmationModal from './components/modals/ConfirmationModal';
 import ImportRoutineModal from './components/modals/ImportRoutineModal';
 import ImportBackupModal from './components/modals/ImportBackupModal';
 import { downloadBackup } from './utils/backup';
+import { mergeBackup } from './utils/backup.core';
 import Dashboard from './views/Dashboard';
 import CreateRoutine from './views/CreateRoutine';
 import SessionSetup from './views/SessionSetup';
@@ -304,7 +305,8 @@ export default function App() {
     downloadBackup({ history, customRoutines });
   };
 
-  const importData = (merged) => {
+  const importData = (imported) => {
+    const merged = mergeBackup({ history, customRoutines }, imported);
     setHistory(merged.history);
     localStorage.setItem('muscuGainHistory', JSON.stringify(merged.history));
     setCustomRoutines(merged.customRoutines);

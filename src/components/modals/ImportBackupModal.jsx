@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { X, Upload, AlertTriangle } from 'lucide-react';
 import Button from '../ui/Button';
-import { readBackupFile, } from '../../utils/backup.js';
+import { readBackupFile } from '../../utils/backup.js';
 import { mergeBackup } from '../../utils/backup.core.js';
 
 export default function ImportBackupModal({ isOpen, onClose, current, onConfirm }) {
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState(null); // { merged, stats }
+  const [preview, setPreview] = useState(null); // { imported, stats }
 
   if (!isOpen) return null;
 
@@ -22,7 +22,7 @@ export default function ImportBackupModal({ isOpen, onClose, current, onConfirm 
     try {
       const imported = await readBackupFile(file);
       const merged = mergeBackup(current, imported);
-      setPreview({ merged, stats: merged.stats });
+      setPreview({ imported, stats: merged.stats });
     } catch (err) {
       setError(err.message);
     }
@@ -31,7 +31,7 @@ export default function ImportBackupModal({ isOpen, onClose, current, onConfirm 
 
   const confirm = () => {
     if (!preview) return;
-    onConfirm(preview.merged);
+    onConfirm(preview.imported);
     close();
   };
 
