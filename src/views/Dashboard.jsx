@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload } from 'lucide-react';
+import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Download, Save } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { DEFAULT_ROUTINES } from '../data/routines';
@@ -16,6 +16,8 @@ export default function Dashboard({
   resumeLastSession,
   canResumeSession,
   onImportClick,
+  onExportClick,
+  onBackupImportClick,
 }) {
   const coachAdvice = useMemo(() => {
     if (history.length === 0) {
@@ -116,6 +118,16 @@ export default function Dashboard({
           </span>
           <span className="text-xs text-slate-400 uppercase tracking-wide mt-1">Volume (kg)</span>
         </Card>
+      </div>
+
+      {/* Sauvegarde données */}
+      <div className="flex items-center gap-2 mt-6">
+        <button onClick={onExportClick} className="flex-1 bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors border border-slate-600">
+          <Download size={14} /> Exporter
+        </button>
+        <button onClick={onBackupImportClick} className="flex-1 bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors border border-slate-600">
+          <Save size={14} /> Importer données
+        </button>
       </div>
 
       {/* Programmes */}
