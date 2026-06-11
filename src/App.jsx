@@ -15,6 +15,7 @@ import Cooldown from './views/Cooldown';
 import History from './views/History';
 import BodyAnalysis from './views/BodyAnalysis';
 import { useToast } from './components/ui/Toast';
+import { requestPersistentStorage } from './utils/persistence';
 
 export default function App() {
   const showToast = useToast();
@@ -103,6 +104,8 @@ export default function App() {
         localStorage.removeItem('muscuGainLastFinishedSession');
       }
     }
+
+    requestPersistentStorage();
   }, []);
 
   // --- Auto-Save ---
