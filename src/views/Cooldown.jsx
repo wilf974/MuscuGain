@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Wind, X, Trophy } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { formatTime, formatDuration, calculateVolume } from '../utils/format';
@@ -5,6 +6,7 @@ import { detectNewPRs } from '../utils/records.core';
 
 export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, workoutData, saveAndExit, history }) {
   const newPRs = detectNewPRs(history || [], { exercises: workoutData });
+  const [notes, setNotes] = useState('');
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center fade-in pb-24 relative">
@@ -41,7 +43,17 @@ export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, w
           <div className="text-xl font-bold text-green-400">{Math.round(calculateVolume(workoutData))} kg</div>
         </div>
       </div>
-      <Button fullWidth onClick={saveAndExit} className="bg-green-600 hover:bg-green-500 shadow-green-900/50 max-w-sm">
+      <div className="w-full max-w-sm mb-4 text-left">
+        <label className="block text-xs text-slate-500 uppercase font-bold mb-1">Notes (optionnel)</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          placeholder="Ressenti, douleurs, remarques…"
+          className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-white placeholder-slate-600 focus:border-blue-500 outline-none resize-none"
+        />
+      </div>
+      <Button fullWidth onClick={() => saveAndExit(notes)} className="bg-green-600 hover:bg-green-500 shadow-green-900/50 max-w-sm">
         Enregistrer et Quitter
       </Button>
     </div>

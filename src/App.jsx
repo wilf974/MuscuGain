@@ -13,8 +13,10 @@ import Workout from './views/Workout';
 import Cooldown from './views/Cooldown';
 import History from './views/History';
 import BodyAnalysis from './views/BodyAnalysis';
+import { useToast } from './components/ui/Toast';
 
 export default function App() {
+  const showToast = useToast();
   const [view, setView] = useState('dashboard');
   const [activeRoutine, setActiveRoutine] = useState(null);
   const [workoutData, setWorkoutData] = useState({});
@@ -219,13 +221,14 @@ export default function App() {
     setView('cooldown');
   };
 
-  const saveAndExit = () => {
+  const saveAndExit = (notes = '') => {
     const newEntry = {
       date: new Date().toISOString(),
       routineName: activeRoutine.name,
       exercises: workoutData,
       totalVolume: calculateVolume(workoutData),
       durationSeconds: sessionDuration,
+      notes: (notes || '').trim(),
     };
     const newHistory = [newEntry, ...history];
     setHistory(newHistory);
@@ -252,6 +255,7 @@ export default function App() {
     setActiveRoutine(null);
     setSessionStartTime(null);
     setPhaseStartTime(null);
+    showToast('Séance enregistrée');
   };
 
   const startRestTimer = (seconds) => {
@@ -292,10 +296,12 @@ export default function App() {
       const updated = customRoutines.filter((r) => r.id !== confirmModal.id);
       setCustomRoutines(updated);
       localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+      showToast('Programme supprimé');
     } else if (confirmModal.type === 'history') {
       const newHistory = history.filter((_, i) => i !== confirmModal.id);
       setHistory(newHistory);
       localStorage.setItem('muscuGainHistory', JSON.stringify(newHistory));
+      showToast('Séance supprimée');
     }
     setConfirmModal({ ...confirmModal, isOpen: false });
   };

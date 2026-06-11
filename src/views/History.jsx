@@ -75,6 +75,12 @@ export default function History({ history, requestDeleteHistory }) {
                         </div>
                       </div>
                     ))}
+                    {session.notes && (
+                      <div className="bg-slate-900/60 rounded-lg p-3">
+                        <div className="text-xs font-semibold text-slate-400 mb-1">Notes</div>
+                        <p className="text-sm text-slate-300 whitespace-pre-wrap">{session.notes}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
