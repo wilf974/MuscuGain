@@ -29,14 +29,15 @@ Mise à jour : 2026-06-11. Vision : **le coach de musculation dans la poche d'un
 - [x] **Suggestion de charge** : puce « Suggéré : X kg » par exercice dans Workout (`suggestLoad`, +2.5 kg si reps cible atteintes), clic → remplit les séries non faites.
 - Garde-fous : payload borné (résumé cap 15 exos/30 séances, objectif tronqué 300 char), noms validés serveur+client, prompt non médical, cache bilan 1/jour. Modèle : NIM `nemotron-nano-12b-v2-vl` (texte).
 
-## Phase 3 — PWA & résilience des données 📱
+## Phase 3 — PWA & résilience des données 📱 ✅ LIVRÉ 2026-06-11 (sauf IndexedDB)
 *Effort : moyen. Valeur : fiabilité (le localStorage est fragile) + usage salle sans réseau.*
 
-- [ ] **Service worker + offline complet** : l'app doit fonctionner en sous-sol de salle de sport. Cache statique + app shell (vite-plugin-pwa).
-- [ ] **Installable** (manifest déjà partiel via InstallPrompt — compléter icônes/splash).
-- [ ] **`navigator.storage.persist()`** : demander la persistance du stockage pour éviter l'éviction silencieuse du localStorage (cause n°1 de perte de données ; l'export JSON a été rejeté, c'est LA protection restante).
-- [ ] **Migration localStorage → IndexedDB** (via wrapper léger) : quotas plus larges, transactions, prépare la suite. Migration transparente au premier lancement.
-- [ ] **Rappel de séance** : notification locale si inactif > X jours (Notification API, opt-in).
+- [x] **Service worker + offline complet** : vite-plugin-pwa (Workbox, `registerType:autoUpdate`), precache app shell, `/api/*` NetworkOnly (jamais de réponse IA périmée) + `navigateFallbackDenylist`.
+- [x] **Installable** : manifest généré (icônes PNG locales 192/512/maskable + apple-touch, fini l'icône CDN externe).
+- [x] **`navigator.storage.persist()`** : `utils/persistence.js`, appelé au démarrage (anti-éviction).
+- [ ] **Migration localStorage → IndexedDB** — **reporté** (hors scope P3, localStorage protégé par persist() en attendant).
+- [x] **Rappel de séance** : `utils/reminder.js` (pur testé : `daysSince`/`shouldRemind`, seuil 3j, 1/jour max) + Notification API opt-in (toggle Dashboard).
+- nginx : `sw.js`/`manifest` en `no-cache` (anti-SW figé).
 
 ## Phase 4 — Suivi corporel élargi 📊
 *Effort : moyen. Valeur : fidélisation, complète l'onglet Analyse.*

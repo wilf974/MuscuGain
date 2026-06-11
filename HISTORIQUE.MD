@@ -3,6 +3,21 @@
 Ce fichier contient un résumé concis des dernières conversations.
 
 ---
+### 11/06/2026 — P3 PWA & résilience (offline, installable, persist, rappels)
+**Demande:** Fin de la roadmap P1→P2→P3. P3 = fiabilité données + usage salle hors-ligne. Livré sauf migration IndexedDB (désélectionnée, reportée).
+**Résultat:** App installable + offline + protection localStorage + rappels (plan → subagent-driven + review qualité approuvée).
+- **PWA** (`vite-plugin-pwa` 1.3.0, Vite 7) : SW Workbox `registerType:autoUpdate`, precache app shell, `navigateFallback` + `navigateFallbackDenylist:[/^\/api\//]`, `/api/*` en **NetworkOnly** (jamais de réponse IA périmée). Manifest généré (`manifest.webmanifest`). SW enregistré dans `main.jsx` (`virtual:pwa-register`, immediate).
+- **Icônes locales** : `public/icon.svg` (dumbbell bleu/slate) → PNG 192/512/maskable-512/apple-touch (ImageMagick + `librsvg2-bin`). Remplace l'ancienne icône CDN externe (flaticon) — gain offline + privacy. Ancien `public/manifest.json` supprimé.
+- **nginx** (`nginx-container.conf`) : `sw.js` `no-cache,no-store,must-revalidate`, `registerSW.js`/`manifest.webmanifest` `no-cache` (anti-SW figé).
+- **storage.persist()** : `utils/persistence.js` `requestPersistentStorage()` (garde navigateur, check `persisted()` avant), appelé fire-and-forget au mount App.
+- **Rappels de séance** : `utils/reminder.js` — purs `daysSince`/`shouldRemind` (testés, 3 tests : seuil 3j, 1/jour max, désactivé/récent/déjà rappelé) + IO `requestReminderPermission`/`fireReminder` (Notification gardée). App mount déclenche si activé + inactif ; toggle « 🔔 Activer les rappels » sur Dashboard (opt-in permission). Clés `muscuGainReminders`, `muscuGainLastReminder`.
+- **Review qualité** (sous-agent) : approuvé, 0 critical/important. Confirme `/api` jamais caché (POST + NetworkOnly + denylist), build Docker OK (`npm ci` installe le plugin, icônes statiques committées), pure/IO séparé, SW no-cache correct. Durcissement appliqué : `navigateFallbackDenylist`, `start_url:'/'`.
+- **Vérifs** : 23 tests core OK, `npm run build` émet `dist/sw.js`+`manifest.webmanifest`+icônes, 2 containers `Up (healthy)`, servis : `sw.js` 200 + `no-cache,no-store`, `pwa-192x192.png` 200, manifest JSON `start_url:/`.
+**Fichiers créés:** `public/icon.svg`+4 PNG, `src/utils/persistence.js`, `src/utils/reminder.js`+`reminder.core.test.js`, plan `docs/superpowers/plans/2026-06-11-p3-pwa-resilience.md`
+**Fichiers modifiés:** `vite.config.js`, `src/main.jsx`, `index.html`, `nginx-container.conf`, `src/App.jsx`, `src/views/Dashboard.jsx`, `package.json`/lock
+**Fichiers supprimés:** `public/manifest.json`
+
+---
 ### 11/06/2026 — P2 Coach IA (bilan, génération programme, croisement corps, suggestion charge)
 **Demande:** Suite roadmap P1→P2→P3. P2 = le différenciateur « l'IA digère le JSON ». 4 sous-features livrées.
 **Résultat:** Coach IA opérationnel + déployé (plan → subagent-driven TDD + review qualité approuvée).

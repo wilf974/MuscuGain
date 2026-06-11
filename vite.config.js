@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'MuscuGain',
         short_name: 'MuscuGain',
         description: 'Suivi de musculation local-first avec coach IA',
-        start_url: '.',
+        start_url: '/',
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: '#0f172a',
@@ -26,6 +26,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         // Ne JAMAIS cacher les appels IA (dynamiques) : NetworkOnly
         runtimeCaching: [
           {
