@@ -60,3 +60,9 @@ export const MUSCLE_LABELS = {
   arms: 'Bras',
   abs: 'Abdos',
 };
+
+// nom d'exercice -> catégorie (pour les résumés/statistiques)
+export const EXERCISE_CATEGORY = Object.fromEntries(
+  Object.entries(EXERCISES_DB).flatMap(([cat, list]) => list.map((name) => [name, cat]))
+);
+export const categoryOf = (name) => EXERCISE_CATEGORY[name] || 'other';
