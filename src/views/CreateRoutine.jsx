@@ -154,7 +154,7 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
                       <X size={16} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <div>
                       <label className="text-slate-500">Séries</label>
                       <input type="number" value={exObj.targetSets} onChange={(e) => updateFieldAt(idx, 'targetSets', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />

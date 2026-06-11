@@ -283,9 +283,9 @@ export default function Dashboard({
       )}
 
       {/* Programmes */}
-      <div className="flex justify-between items-end mt-8 mb-4">
-        <h2 className="text-lg font-semibold text-white">Programmes</h2>
-        <div className="flex items-center gap-2">
+      <div className="mt-8 mb-4">
+        <h2 className="text-lg font-semibold text-white mb-3">Programmes</h2>
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={onGenerateClick} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-500/30">
             <Sparkles size={14} /> Générer par IA
           </button>
