@@ -46,7 +46,7 @@ export function fileToDataUrl(file, max = 768, quality = 0.72) {
 
 // Reconnaît la machine sur la photo. Retourne { label, candidates } (>=1 candidat) ou lève RecognizeError.
 export async function recognizeMachine(file, allowedExercises) {
-  const image = await fileToDataUrl(file);
+  const image = await fileToDataUrl(file, 1280, 0.85);
   let res;
   try {
     res = await fetch('/api/recognize-exercise', {

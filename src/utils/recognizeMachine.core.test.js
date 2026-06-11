@@ -13,7 +13,9 @@ test('flattenExercises tolère un db vide', () => {
 test('normalizeResult réponse normale', () => {
   const r = normalizeResult({ label: 'IRON', candidates: [{ exercise: 'Chest Press', confidence: 0.9 }] });
   assert.equal(r.label, 'IRON');
-  assert.deepEqual(r.candidates, [{ exercise: 'Chest Press', confidence: 0.9 }]);
+  assert.equal(r.candidates.length, 1);
+  assert.equal(r.candidates[0].exercise, 'Chest Press');
+  assert.equal(r.candidates[0].confidence, 0.9);
 });
 
 test('normalizeResult tronque à 3 candidats', () => {
@@ -29,7 +31,9 @@ test('normalizeResult confidence manquante -> null', () => {
 
 test('normalizeResult filtre les candidats sans exercise', () => {
   const r = normalizeResult({ candidates: [{ confidence: 0.9 }, { exercise: 'OK', confidence: 0.5 }] });
-  assert.deepEqual(r.candidates, [{ exercise: 'OK', confidence: 0.5 }]);
+  assert.equal(r.candidates.length, 1);
+  assert.equal(r.candidates[0].exercise, 'OK');
+  assert.equal(r.candidates[0].confidence, 0.5);
 });
 
 test('normalizeResult JSON vide/invalide', () => {

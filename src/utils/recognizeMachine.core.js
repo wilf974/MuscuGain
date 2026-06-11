@@ -17,6 +17,8 @@ export function normalizeResult(json) {
     .map((c) => ({
       exercise: String(c.exercise).trim(),
       confidence: Number.isFinite(Number(c.confidence)) ? Number(c.confidence) : null,
+      muscleGroup: typeof c.muscleGroup === 'string' && c.muscleGroup.trim() ? c.muscleGroup.trim() : null,
+      inList: c.inList === true,
     }))
     .slice(0, 3);
   return out;
