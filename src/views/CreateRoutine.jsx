@@ -1,11 +1,23 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronUp, ChevronDown, X, Check } from 'lucide-react';
 import Button from '../components/ui/Button';
+import { useToast } from '../components/ui/Toast';
 import { EXERCISES_DB, MUSCLE_LABELS } from '../data/exercises';
 
-export default function CreateRoutine({ setView, customRoutines, setCustomRoutines }) {
-  const [newRoutineName, setNewRoutineName] = useState('');
-  const [newRoutineExercises, setNewRoutineExercises] = useState([]);
+export default function CreateRoutine({ setView, customRoutines, setCustomRoutines, editingRoutine = null }) {
+  const showToast = useToast();
+  const [newRoutineName, setNewRoutineName] = useState(() => (editingRoutine ? editingRoutine.name : ''));
+  const [newRoutineExercises, setNewRoutineExercises] = useState(() =>
+    editingRoutine
+      ? editingRoutine.exercises.map((ex) => ({
+          name: ex.name,
+          targetSets: ex.targetSets ?? '',
+          targetReps: ex.targetReps ?? '',
+          startingWeight: ex.startingWeight ?? '',
+          restSeconds: ex.restSeconds ?? '',
+        }))
+      : []
+  );
   const [expandedCategory, setExpandedCategory] = useState(null);
 
   const toggleExerciseSelection = (exerciseName) => {
@@ -13,14 +25,32 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
     if (existingIndex >= 0) {
       setNewRoutineExercises(newRoutineExercises.filter((_, idx) => idx !== existingIndex));
     } else {
-      setNewRoutineExercises([...newRoutineExercises, { name: exerciseName, targetSets: '', targetReps: '', startingWeight: '' }]);
+      setNewRoutineExercises([...newRoutineExercises, { name: exerciseName, targetSets: '', targetReps: '', startingWeight: '', restSeconds: '' }]);
     }
   };
 
-  const updateField = (exerciseName, field, value) => {
-    const updated = newRoutineExercises.map((ex) => {
-      if (ex.name !== exerciseName) return ex;
-      if (field === 'startingWeight') return { ...ex, startingWeight: value };
+  const removeAt = (idx) => {
+    setNewRoutineExercises(newRoutineExercises.filter((_, i) => i !== idx));
+  };
+
+  const moveUp = (idx) => {
+    if (idx <= 0) return;
+    const updated = [...newRoutineExercises];
+    [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+    setNewRoutineExercises(updated);
+  };
+
+  const moveDown = (idx) => {
+    if (idx >= newRoutineExercises.length - 1) return;
+    const updated = [...newRoutineExercises];
+    [updated[idx + 1], updated[idx]] = [updated[idx], updated[idx + 1]];
+    setNewRoutineExercises(updated);
+  };
+
+  const updateFieldAt = (idx, field, value) => {
+    const updated = newRoutineExercises.map((ex, i) => {
+      if (i !== idx) return ex;
+      if (field === 'startingWeight' || field === 'restSeconds') return { ...ex, [field]: value };
       return { ...ex, [field]: value === '' ? '' : Math.max(1, parseInt(value) || 1) };
     });
     setNewRoutineExercises(updated);
@@ -28,16 +58,44 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
 
   const saveCustomRoutine = () => {
     if (!newRoutineName.trim() || newRoutineExercises.length === 0) return;
-    const newRoutine = {
-      id: 'custom_' + Date.now(),
-      name: newRoutineName,
-      desc: 'Programme personnalisé',
-      exercises: newRoutineExercises,
-      isCustom: true,
-    };
-    const updatedRoutines = [newRoutine, ...customRoutines];
+
+    const normalizedExercises = newRoutineExercises.map((ex) => {
+      const out = {
+        name: ex.name,
+        targetSets: ex.targetSets,
+        targetReps: ex.targetReps,
+        startingWeight: ex.startingWeight,
+      };
+      const rest = parseInt(ex.restSeconds);
+      if (ex.restSeconds !== '' && ex.restSeconds != null && !isNaN(rest) && rest > 0) {
+        out.restSeconds = rest;
+      }
+      return out;
+    });
+
+    let updatedRoutines;
+    if (editingRoutine) {
+      const updatedRoutine = {
+        ...editingRoutine,
+        name: newRoutineName,
+        exercises: normalizedExercises,
+        isCustom: true,
+      };
+      updatedRoutines = customRoutines.map((r) => (r.id === editingRoutine.id ? updatedRoutine : r));
+    } else {
+      const newRoutine = {
+        id: 'custom_' + Date.now(),
+        name: newRoutineName,
+        desc: 'Programme personnalisé',
+        exercises: normalizedExercises,
+        isCustom: true,
+      };
+      updatedRoutines = [newRoutine, ...customRoutines];
+    }
+
     setCustomRoutines(updatedRoutines);
     localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updatedRoutines));
+    showToast(editingRoutine ? 'Programme mis à jour' : 'Programme créé');
     setView('dashboard');
   };
 
@@ -47,7 +105,7 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
     <div className="pb-32 fade-in">
       <header className="sticky top-0 z-10 bg-slate-900/90 backdrop-blur-md py-4 border-b border-slate-800 flex items-center gap-4 mb-6">
         <button onClick={() => setView('dashboard')} className="text-slate-400 hover:text-white"><ChevronLeft size={20} /></button>
-        <h2 className="font-bold text-lg text-white">Créer un programme</h2>
+        <h2 className="font-bold text-lg text-white">{editingRoutine ? 'Modifier le programme' : 'Créer un programme'}</h2>
       </header>
 
       <div className="space-y-6">
@@ -74,24 +132,44 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
             <div className="bg-slate-800 rounded-xl p-2 space-y-2">
               {newRoutineExercises.map((exObj, idx) => (
                 <div key={idx} className="bg-slate-700/50 p-3 rounded-lg space-y-2">
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center gap-2">
                     <span className="text-sm font-medium flex-1 truncate">{exObj.name}</span>
-                    <button onClick={() => toggleExerciseSelection(exObj.name)} className="text-slate-400 hover:text-red-400">
+                    <button
+                      onClick={() => moveUp(idx)}
+                      disabled={idx === 0}
+                      aria-label="Monter"
+                      className="text-slate-400 hover:text-blue-400 disabled:opacity-30 disabled:hover:text-slate-400 disabled:cursor-not-allowed"
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                    <button
+                      onClick={() => moveDown(idx)}
+                      disabled={idx === newRoutineExercises.length - 1}
+                      aria-label="Descendre"
+                      className="text-slate-400 hover:text-blue-400 disabled:opacity-30 disabled:hover:text-slate-400 disabled:cursor-not-allowed"
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                    <button onClick={() => removeAt(idx)} aria-label="Supprimer l'exercice" className="text-slate-400 hover:text-red-400">
                       <X size={16} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-4 gap-2 text-xs">
                     <div>
                       <label className="text-slate-500">Séries</label>
-                      <input type="number" value={exObj.targetSets} onChange={(e) => updateField(exObj.name, 'targetSets', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                      <input type="number" value={exObj.targetSets} onChange={(e) => updateFieldAt(idx, 'targetSets', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
                     </div>
                     <div>
                       <label className="text-slate-500">Reps</label>
-                      <input type="number" value={exObj.targetReps} onChange={(e) => updateField(exObj.name, 'targetReps', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                      <input type="number" value={exObj.targetReps} onChange={(e) => updateFieldAt(idx, 'targetReps', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
                     </div>
                     <div>
                       <label className="text-slate-500">Poids (kg)</label>
-                      <input type="number" step="any" value={exObj.startingWeight} onChange={(e) => updateField(exObj.name, 'startingWeight', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                      <input type="number" step="any" value={exObj.startingWeight} onChange={(e) => updateFieldAt(idx, 'startingWeight', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-slate-500">Pause (s)</label>
+                      <input type="number" value={exObj.restSeconds} onChange={(e) => updateFieldAt(idx, 'restSeconds', e.target.value)} placeholder="0" className="w-full bg-slate-900 border border-slate-700 rounded p-1 text-center text-white text-xs focus:border-blue-500 outline-none" />
                     </div>
                   </div>
                 </div>
@@ -147,7 +225,7 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
             onClick={saveCustomRoutine}
             className={!canSave ? 'opacity-50 cursor-not-allowed' : ''}
           >
-            Sauvegarder le programme
+            {editingRoutine ? 'Mettre à jour' : 'Sauvegarder le programme'}
           </Button>
         </div>
       </div>
