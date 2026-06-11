@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronUp, ChevronDown, X, Check } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
-import { EXERCISES_DB, MUSCLE_LABELS } from '../data/exercises';
+import { mergedCatalog, loadCustomExercises } from '../data/customExercises';
 
 export default function CreateRoutine({ setView, customRoutines, setCustomRoutines, editingRoutine = null }) {
   const showToast = useToast();
@@ -19,6 +19,7 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
       : []
   );
   const [expandedCategory, setExpandedCategory] = useState(null);
+  const [catalog] = useState(() => mergedCatalog(loadCustomExercises()));
 
   const toggleExerciseSelection = (exerciseName) => {
     const existingIndex = newRoutineExercises.findIndex((ex) => ex.name === exerciseName);
@@ -183,14 +184,14 @@ export default function CreateRoutine({ setView, customRoutines, setCustomRoutin
         <div>
           <label className="block text-xs text-slate-400 uppercase font-bold mb-3">Ajouter des exercices</label>
           <div className="space-y-3">
-            {Object.entries(EXERCISES_DB).map(([category, exercises]) => {
+            {catalog.map(({ category, label, exercises }) => {
               const isExpanded = expandedCategory === category;
               return (
                 <div key={category} className="border border-slate-700 rounded-xl overflow-hidden bg-slate-800/50">
                   <button onClick={() => setExpandedCategory(isExpanded ? null : category)} className="w-full flex justify-between items-center p-4 hover:bg-slate-700/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className={`w-2 h-8 rounded-full ${isExpanded ? 'bg-blue-500' : 'bg-slate-600'}`}></div>
-                      <span className="font-semibold text-white capitalize">{MUSCLE_LABELS[category]}</span>
+                      <span className="font-semibold text-white capitalize">{label}</span>
                     </div>
                     {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                   </button>
