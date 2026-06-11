@@ -3,6 +3,20 @@
 Ce fichier contient un résumé concis des dernières conversations.
 
 ---
+### 11/06/2026 — P1 Confort de séance (7 quick-wins UX)
+**Demande:** Roadmap d'amélioration (UI/UX/backend/fonctionnalités) puis exécution P1→P2→P3. P1 livré.
+**Résultat:** 7 features confort livrées + déployées (workflow superpowers : plan → subagent-driven + review qualité).
+- **Système de toasts** : `components/ui/Toast.jsx` (`ToastProvider` contexte + `useToast`, auto-dismiss 2.6s, charte success/error/info), enveloppe `<App/>` dans `main.jsx`. Branché : programme créé/màj/supprimé, séance enregistrée/supprimée.
+- **CreateRoutine** refondu : ops par index (au lieu de par nom) → réordonner (↑/↓), supprimer, **éditer** un programme existant (prop `editingRoutine`, garde l'`id`, titre « Modifier »/« Mettre à jour »), champ **« Pause (s) »** par exercice (→ `restSeconds`, strippé si vide/0).
+- **Dashboard/App** : crayon (éditer) + copie (dupliquer, suffixe « (copie) ») sur les cartes perso ; state `editingRoutine`, handlers `startEditRoutine`/`startCreateRoutine`/`duplicateRoutine`.
+- **Workout** : supprimer une série (bouton ✕ par ligne, si >1 set, garde ≥1).
+- **Notes de séance** : textarea en Cooldown → `saveAndExit(notes)` → `entry.notes` → affichée dans l'histo détaillé (rétro-compatible, `whitespace-pre-wrap`).
+- **Review qualité** (sous-agent) : approuvé, 0 critical/important ; normalisation `restSeconds` correcte, removeSet gardé aux 2 niveaux, notes rétro-compatibles, handlers index-keyed corrects.
+- **Vérifs** : tests core OK, `npm run build` OK, 2 containers `Up (healthy)`, HTTP 200, bundle contient les strings UI (« Mettre à jour », « Notes (optionnel) », « Programme créé »).
+**Fichiers créés:** `src/components/ui/Toast.jsx`, plan `docs/superpowers/plans/2026-06-11-p1-confort-seance.md`, `ROADMAP.md`
+**Fichiers modifiés:** `src/main.jsx`, `src/views/CreateRoutine.jsx`, `src/App.jsx`, `src/views/Dashboard.jsx`, `src/views/Workout.jsx`, `src/views/Cooldown.jsx`, `src/views/History.jsx`
+
+---
 ### 10/06/2026 — Onglet Analyse corporelle (IA) + retrait export/import JSON
 **Demande:** 2 temps. (1) Enchaîner 4 features (export/import JSON, histo détaillé, graphique volume, records PR). (2) Pivot : retirer l'export/import JSON (illisible pour un néophyte, rien d'exposé à l'utilisateur) et construire un onglet d'**analyse corporelle par IA** (≠ reco machine).
 **Résultat:** Histo détaillé + graphique volume + records PR conservés ; export/import JSON retiré ; nouvel onglet « Analyse » livré et déployé (workflow superpowers : brainstorm → spec → plan → subagent-driven TDD + reviews spec/qualité).

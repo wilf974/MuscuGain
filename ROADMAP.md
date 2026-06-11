@@ -9,16 +9,16 @@ Mise à jour : 2026-06-11. Vision : **le coach de musculation dans la poche d'un
 
 ---
 
-## Phase 1 — Confort de séance (quick wins UX)
+## Phase 1 — Confort de séance (quick wins UX) ✅ LIVRÉ 2026-06-11
 *Effort : faible. Valeur : immédiate, chaque séance.*
 
-- [ ] **Supprimer une série** pendant la séance (swipe ou bouton ✕) — on peut en ajouter mais pas en retirer.
-- [ ] **Éditer un programme existant** — aujourd'hui on ne peut que créer/supprimer. Réutiliser CreateRoutine en mode édition.
-- [ ] **Réordonner les exercices** d'un programme (flèches haut/bas, pas de lib drag&drop).
-- [ ] **Dupliquer un programme** (copie + suffixe « (copie) »).
-- [ ] **Timer de repos éditable dans l'UI** — `restSeconds` existe (import xlsx) mais pas exposé dans CreateRoutine. Champ « pause » par exercice.
-- [ ] **Toast de confirmation** (sauvegarde programme, import, fin de séance) — composant Toast maison, charte fade-in.
-- [ ] **Notes par séance** — champ libre en Cooldown, affiché dans l'histo détaillé.
+- [x] **Supprimer une série** pendant la séance (bouton ✕ par ligne, si >1 set).
+- [x] **Éditer un programme existant** — CreateRoutine en mode édition (garde l'id), crayon sur la carte perso.
+- [x] **Réordonner les exercices** d'un programme (flèches ↑/↓, ops par index).
+- [x] **Dupliquer un programme** (copie + suffixe « (copie) »).
+- [x] **Timer de repos éditable dans l'UI** — champ « Pause (s) » par exercice dans CreateRoutine → `restSeconds`.
+- [x] **Toast de confirmation** — `ToastProvider` + `useToast` (save/édit/suppr/import).
+- [x] **Notes par séance** — textarea en Cooldown, stockée (`entry.notes`), affichée dans l'histo détaillé.
 
 ## Phase 2 — Coach IA (le différenciateur) 🧠
 *Effort : moyen. Valeur : cœur de la vision « l'IA a accès au JSON ».*

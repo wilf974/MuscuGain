@@ -51,7 +51,7 @@ Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (D
 
 ## Roadmap (détail : `ROADMAP.md`)
 Vision : coach de muscu pour néophyte — l'IA digère les données, l'utilisateur ne manipule jamais de JSON.
-- **P1 Confort séance** : suppr. série, éditer/réordonner/dupliquer programme, pause par exo dans l'UI, toasts, notes séance.
+- **P1 Confort séance** ✅ livré : suppr. série en séance, éditer (crayon, garde id)/réordonner (↑↓)/dupliquer programme, champ « Pause (s) » par exo dans CreateRoutine, toasts (`ui/Toast.jsx` : `ToastProvider`+`useToast`), notes séance (`entry.notes` Cooldown→History).
 - **P2 Coach IA** ⭐ : `POST /coach-analysis` (historique JSON → bilan LLM : plateaux, équilibre, deload), croisement corps×training, génération de programme par IA, suggestion de charge.
 - **P3 PWA/résilience** : service worker offline, `storage.persist()`, migration IndexedDB, rappels. Urgent : seule protection données depuis le rejet de l'export.
 - **P4 Suivi corporel+** : poids/mensurations + courbes, 1RM Epley, graphique par exercice.
