@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, Check, Play, Dumbbell } from 'lucide-react';
+import { X, Plus, Check, Play, Dumbbell, Trash2 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import VideoModal from '../components/modals/VideoModal';
 import AddExerciseModal from '../components/modals/AddExerciseModal';
@@ -36,6 +36,13 @@ export default function Workout({
     const newData = { ...workoutData };
     const prevSet = newData[exercise][newData[exercise].length - 1];
     newData[exercise] = [...newData[exercise], { weight: prevSet ? prevSet.weight : '', reps: prevSet ? prevSet.reps : '', done: false }];
+    setWorkoutData(newData);
+  };
+
+  const removeSet = (exercise, index) => {
+    const newData = { ...workoutData };
+    if (!newData[exercise] || newData[exercise].length <= 1) return;
+    newData[exercise] = newData[exercise].filter((_, i) => i !== index);
     setWorkoutData(newData);
   };
 
@@ -161,7 +168,14 @@ export default function Workout({
                 </div>
                 {workoutData[exName] && workoutData[exName].map((set, setIndex) => (
                   <div key={setIndex} className={`grid grid-cols-10 gap-2 items-center bg-slate-800/50 rounded-lg p-2 transition-colors ${set.done ? 'bg-green-900/20 border border-green-900/30' : ''}`}>
-                    <div className="col-span-2 text-center font-mono text-slate-400">{setIndex + 1}</div>
+                    <div className="col-span-2 flex items-center justify-center gap-1 font-mono text-slate-400">
+                      <span>{setIndex + 1}</span>
+                      {workoutData[exName].length > 1 && (
+                        <button onClick={() => removeSet(exName, setIndex)} className="text-slate-600 hover:text-red-400 transition-colors" aria-label="Supprimer la série">
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
                     <div className="col-span-3">
                       <input type="number" step="any" placeholder="0" value={set.weight} onChange={(e) => updateSet(exName, setIndex, 'weight', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center text-white focus:border-blue-500 outline-none font-bold" />
                     </div>
