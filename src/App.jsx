@@ -5,6 +5,7 @@ import InstallPrompt from './components/InstallPrompt';
 import NavBar from './components/NavBar';
 import ConfirmationModal from './components/modals/ConfirmationModal';
 import ImportRoutineModal from './components/modals/ImportRoutineModal';
+import GenerateProgramModal from './components/modals/GenerateProgramModal';
 import Dashboard from './views/Dashboard';
 import CreateRoutine from './views/CreateRoutine';
 import SessionSetup from './views/SessionSetup';
@@ -33,6 +34,8 @@ export default function App() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   // Import routines modal
   const [importModalOpen, setImportModalOpen] = useState(false);
+  // Generate program (IA) modal
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
 
   // Timer States
   const [sessionStartTime, setSessionStartTime] = useState(null);
@@ -336,6 +339,21 @@ export default function App() {
     localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
   };
 
+  // --- Programme généré par IA ---
+  const addGeneratedRoutine = (program) => {
+    const routine = {
+      id: 'custom_' + Date.now(),
+      name: program.name || 'Programme IA',
+      desc: 'Généré par IA',
+      exercises: program.exercises,
+      isCustom: true,
+    };
+    const updated = [routine, ...customRoutines];
+    setCustomRoutines(updated);
+    localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+    showToast('Programme généré');
+  };
+
   const startEditRoutine = (routine) => {
     setEditingRoutine(routine);
     setView('create');
@@ -428,6 +446,13 @@ export default function App() {
         onConfirm={importRoutines}
       />
 
+      {/* Generate program (IA) modal */}
+      <GenerateProgramModal
+        isOpen={generateModalOpen}
+        onClose={() => setGenerateModalOpen(false)}
+        onSave={addGeneratedRoutine}
+      />
+
       {view === 'dashboard' && (
         <Dashboard
           history={history}
@@ -441,6 +466,7 @@ export default function App() {
           resumeLastSession={resumeLastSession}
           canResumeSession={canResumeSession}
           onImportClick={() => setImportModalOpen(true)}
+          onGenerateClick={() => setGenerateModalOpen(true)}
           onCreateClick={startCreateRoutine}
           onEditRoutine={startEditRoutine}
           onDuplicateRoutine={duplicateRoutine}

@@ -19,6 +19,7 @@ export default function Dashboard({
   resumeLastSession,
   canResumeSession,
   onImportClick,
+  onGenerateClick,
   onCreateClick,
   onEditRoutine,
   onDuplicateRoutine,
@@ -254,6 +255,9 @@ export default function Dashboard({
       <div className="flex justify-between items-end mt-8 mb-4">
         <h2 className="text-lg font-semibold text-white">Programmes</h2>
         <div className="flex items-center gap-2">
+          <button onClick={onGenerateClick} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-500/30">
+            <Sparkles size={14} /> Générer par IA
+          </button>
           <button onClick={onImportClick} className="bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-slate-600">
             <Upload size={14} /> Importer
           </button>
