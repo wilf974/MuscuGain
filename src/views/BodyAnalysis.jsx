@@ -168,26 +168,51 @@ function ResultsCards({ entry }) {
   );
 }
 
+// ─── CaptureButtons ───────────────────────────────────────────────────────────
+
+function CaptureButtons({ triggerCapture }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <button
+        type="button"
+        onClick={() => triggerCapture('camera')}
+        className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-blue-300 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-colors active:scale-95"
+      >
+        <Camera size={20} />
+        <span className="text-sm">Prendre une photo</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => triggerCapture('gallery')}
+        className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-slate-300 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 transition-colors active:scale-95"
+      >
+        <ImageIcon size={20} />
+        <span className="text-sm">Galerie</span>
+      </button>
+    </div>
+  );
+}
+
 // ─── Timeline accordion ───────────────────────────────────────────────────────
 
 function Timeline({ bodyAnalyses }) {
-  const [expandedIdx, setExpandedIdx] = useState(null);
+  const [expandedDate, setExpandedDate] = useState(null);
 
   if (!bodyAnalyses || bodyAnalyses.length === 0) return null;
 
   return (
     <div className="space-y-3">
       <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Analyses passées</h2>
-      {bodyAnalyses.map((entry, idx) => {
-        const isOpen = expandedIdx === idx;
+      {bodyAnalyses.map((entry) => {
+        const isOpen = expandedDate === entry.date;
         const preview = entry.evolutionNote
           ? entry.evolutionNote.split(/[.!?]/)[0].trim()
           : null;
         return (
-          <Card key={idx}>
+          <Card key={entry.date}>
             <button
               type="button"
-              onClick={() => setExpandedIdx(isOpen ? null : idx)}
+              onClick={() => setExpandedDate(isOpen ? null : entry.date)}
               className="w-full text-left"
             >
               <div className="flex items-center justify-between gap-2">
@@ -303,6 +328,8 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis }) {
   };
 
   const handleConsentAccept = () => {
+    // Guard: ignore if already processed (prevents double-click double-schedule)
+    if (status !== 'consent' || !pendingSource) return;
     localStorage.setItem('muscuGainBodyConsent', '1');
     const src = pendingSource;
     setPendingSource(null);
@@ -341,28 +368,6 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis }) {
     setCurrentEntry(null);
     setErrorMsg('');
   };
-
-  // ── Capture buttons (reused in idle) ──
-  const CaptureButtons = () => (
-    <div className="grid grid-cols-2 gap-3">
-      <button
-        type="button"
-        onClick={() => triggerCapture('camera')}
-        className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-blue-300 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-colors active:scale-95"
-      >
-        <Camera size={20} />
-        <span className="text-sm">Prendre une photo</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => triggerCapture('gallery')}
-        className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-slate-300 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 transition-colors active:scale-95"
-      >
-        <ImageIcon size={20} />
-        <span className="text-sm">Galerie</span>
-      </button>
-    </div>
-  );
 
   return (
     <div className="space-y-6 pb-24 fade-in">
@@ -460,7 +465,7 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis }) {
                 </p>
               </div>
             </div>
-            <CaptureButtons />
+            <CaptureButtons triggerCapture={triggerCapture} />
           </Card>
 
           {/* Timeline */}
