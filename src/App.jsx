@@ -23,6 +23,7 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [customRoutines, setCustomRoutines] = useState([]);
   const [bodyAnalyses, setBodyAnalyses] = useState([]);
+  const [coachAnalysis, setCoachAnalysis] = useState(null);
   const [lastFinishedSession, setLastFinishedSession] = useState(null);
   const [editingRoutine, setEditingRoutine] = useState(null);
 
@@ -60,6 +61,15 @@ export default function App() {
     if (savedRoutines) setCustomRoutines(JSON.parse(savedRoutines));
     const savedBody = localStorage.getItem('muscuGainBodyAnalyses');
     if (savedBody) setBodyAnalyses(JSON.parse(savedBody));
+    const savedCoach = localStorage.getItem('muscuGainCoachAnalysis');
+    if (savedCoach) {
+      try {
+        const parsed = JSON.parse(savedCoach);
+        if (parsed && parsed.date && parsed.data) setCoachAnalysis(parsed);
+      } catch {
+        localStorage.removeItem('muscuGainCoachAnalysis');
+      }
+    }
 
     const savedSession = localStorage.getItem('muscuGainActiveSession');
     if (savedSession) {
@@ -355,6 +365,13 @@ export default function App() {
     localStorage.setItem('muscuGainBodyAnalyses', JSON.stringify(updated));
   };
 
+  // --- Bilan Coach IA (cache 1/jour) ---
+  const saveCoachAnalysis = (data) => {
+    const entry = { date: new Date().toISOString().slice(0, 10), data };
+    setCoachAnalysis(entry);
+    localStorage.setItem('muscuGainCoachAnalysis', JSON.stringify(entry));
+  };
+
   // --- Resume ---
   const canResumeSession = () => {
     if (!lastFinishedSession) return false;
@@ -427,6 +444,9 @@ export default function App() {
           onCreateClick={startCreateRoutine}
           onEditRoutine={startEditRoutine}
           onDuplicateRoutine={duplicateRoutine}
+          coachAnalysis={coachAnalysis}
+          onCoachAnalyzed={saveCoachAnalysis}
+          bodyAnalyses={bodyAnalyses}
         />
       )}
       {view === 'create' && (

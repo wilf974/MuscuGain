@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
-import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Pencil, Copy } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Pencil, Copy, Sparkles, Loader2, TrendingUp, AlertTriangle, BarChart3, Scale, BatteryLow, UserCog } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { DEFAULT_ROUTINES } from '../data/routines';
+import { categoryOf } from '../data/exercises';
+import { buildHistorySummary } from '../utils/coach.core';
+import { fetchCoachAnalysis, CoachError } from '../utils/coach';
 
 export default function Dashboard({
   history,
@@ -19,7 +22,29 @@ export default function Dashboard({
   onCreateClick,
   onEditRoutine,
   onDuplicateRoutine,
+  coachAnalysis,
+  onCoachAnalyzed,
+  bodyAnalyses = [],
 }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const cachedToday = coachAnalysis && coachAnalysis.date === today ? coachAnalysis.data : null;
+  const [coachStatus, setCoachStatus] = useState('idle'); // idle | loading | error
+  const [coachError, setCoachError] = useState('');
+
+  const runCoachAnalysis = async () => {
+    setCoachStatus('loading');
+    setCoachError('');
+    try {
+      const summary = buildHistorySummary(history, categoryOf);
+      const data = await fetchCoachAnalysis(summary, bodyAnalyses[0] || null);
+      onCoachAnalyzed(data);
+      setCoachStatus('idle');
+    } catch (err) {
+      setCoachError(err instanceof CoachError ? err.message : 'Coach IA indisponible, réessaie plus tard.');
+      setCoachStatus('error');
+    }
+  };
+
   const coachAdvice = useMemo(() => {
     if (history.length === 0) {
       return { type: 'info', title: 'Bienvenue !', text: "Complétez votre première séance pour débloquer l'analyse du coach.", icon: 'star' };
@@ -77,6 +102,110 @@ export default function Dashboard({
           <p className="text-sm text-slate-300 mt-1">{coachAdvice.text}</p>
         </div>
       </div>
+
+      {/* Coach IA — bilan de l'historique */}
+      {history.length > 0 && (
+        <Card className="border-blue-500/30 bg-blue-900/10 fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-full bg-blue-500/20 text-blue-400"><Sparkles size={18} /></div>
+              <h3 className="font-bold text-white">Coach IA</h3>
+            </div>
+            {cachedToday && coachStatus !== 'loading' && (
+              <button
+                onClick={runCoachAnalysis}
+                className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+              >
+                <Sparkles size={13} /> Rafraîchir
+              </button>
+            )}
+          </div>
+
+          {coachStatus === 'loading' && (
+            <div className="flex items-center gap-2 text-slate-300 text-sm py-4 justify-center">
+              <Loader2 size={18} className="animate-spin text-blue-400" /> Analyse en cours…
+            </div>
+          )}
+
+          {coachStatus !== 'loading' && coachStatus === 'error' && (
+            <div className="space-y-3">
+              <p className="text-sm text-amber-400">{coachError}</p>
+              <Button onClick={runCoachAnalysis} className="py-2 text-sm">
+                <Sparkles size={15} /> Réessayer
+              </Button>
+            </div>
+          )}
+
+          {coachStatus !== 'loading' && coachStatus !== 'error' && !cachedToday && (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-300">
+                Obtiens un bilan personnalisé de ta progression à partir de ton historique.
+              </p>
+              <Button onClick={runCoachAnalysis} fullWidth className="py-2.5 text-sm">
+                <Sparkles size={16} /> Demander un bilan
+              </Button>
+            </div>
+          )}
+
+          {coachStatus !== 'loading' && coachStatus !== 'error' && cachedToday && (
+            <div className="space-y-4 fade-in">
+              {cachedToday.overview && (
+                <p className="text-sm text-slate-200 leading-relaxed">{cachedToday.overview}</p>
+              )}
+
+              {cachedToday.progression.length > 0 && (
+                <CoachSection icon={TrendingUp} iconColor="text-green-400" title="Progression">
+                  <ul className="space-y-1 mt-2">
+                    {cachedToday.progression.map((t, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-green-300">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-green-400" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CoachSection>
+              )}
+
+              {cachedToday.plateaus.length > 0 && (
+                <CoachSection icon={AlertTriangle} iconColor="text-amber-400" title="Plateaux">
+                  <ul className="space-y-1 mt-2">
+                    {cachedToday.plateaus.map((t, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-amber-300">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CoachSection>
+              )}
+
+              {cachedToday.weeklyVolume && (
+                <CoachSection icon={BarChart3} iconColor="text-blue-400" title="Volume hebdo">
+                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.weeklyVolume}</p>
+                </CoachSection>
+              )}
+
+              {cachedToday.balance && (
+                <CoachSection icon={Scale} iconColor="text-blue-400" title="Équilibre">
+                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.balance}</p>
+                </CoachSection>
+              )}
+
+              {cachedToday.deload && (
+                <CoachSection icon={BatteryLow} iconColor="text-amber-400" title="Deload">
+                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.deload}</p>
+                </CoachSection>
+              )}
+
+              {cachedToday.bodyCross && (
+                <CoachSection icon={UserCog} iconColor="text-blue-400" title="Corps × training">
+                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.bodyCross}</p>
+                </CoachSection>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Active session */}
       {activeRoutine && (
@@ -178,6 +307,18 @@ export default function Dashboard({
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CoachSection({ icon: Icon, iconColor, title, children }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <Icon size={15} className={iconColor} />
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{title}</span>
+      </div>
+      {children}
     </div>
   );
 }
