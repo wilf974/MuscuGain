@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Pencil, Copy, Sparkles, Loader2, TrendingUp, AlertTriangle, BarChart3, Scale, BatteryLow, UserCog } from 'lucide-react';
+import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Pencil, Copy, Sparkles, Loader2, TrendingUp, AlertTriangle, BarChart3, Scale, BatteryLow, UserCog, Bell } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { DEFAULT_ROUTINES } from '../data/routines';
 import { categoryOf } from '../data/exercises';
 import { buildHistorySummary } from '../utils/coach.core';
 import { fetchCoachAnalysis, CoachError } from '../utils/coach';
+import { useToast } from '../components/ui/Toast';
+import { requestReminderPermission } from '../utils/reminder';
 
 export default function Dashboard({
   history,
@@ -31,6 +33,24 @@ export default function Dashboard({
   const cachedToday = coachAnalysis && coachAnalysis.date === today ? coachAnalysis.data : null;
   const [coachStatus, setCoachStatus] = useState('idle'); // idle | loading | error
   const [coachError, setCoachError] = useState('');
+
+  const showToast = useToast();
+  const [remindersOn, setRemindersOn] = useState(
+    typeof localStorage !== 'undefined' && localStorage.getItem('muscuGainReminders') === '1'
+  );
+
+  const enableReminders = async () => {
+    const result = await requestReminderPermission();
+    if (result === 'granted') {
+      localStorage.setItem('muscuGainReminders', '1');
+      setRemindersOn(true);
+      showToast('Rappels activés');
+    } else if (result === 'denied') {
+      showToast('Notifications refusées', 'info');
+    } else {
+      showToast('Notifications non supportées', 'info');
+    }
+  };
 
   const runCoachAnalysis = async () => {
     setCoachStatus('loading');
@@ -250,6 +270,17 @@ export default function Dashboard({
           <span className="text-xs text-slate-400 uppercase tracking-wide mt-1">Volume (kg)</span>
         </Card>
       </div>
+
+      {/* Activer les rappels (opt-in) */}
+      {!remindersOn && (
+        <button
+          type="button"
+          onClick={enableReminders}
+          className="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 px-4 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-slate-700"
+        >
+          <Bell size={16} className="text-blue-400" /> 🔔 Activer les rappels
+        </button>
+      )}
 
       {/* Programmes */}
       <div className="flex justify-between items-end mt-8 mb-4">

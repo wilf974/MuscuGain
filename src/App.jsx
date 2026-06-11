@@ -16,6 +16,7 @@ import History from './views/History';
 import BodyAnalysis from './views/BodyAnalysis';
 import { useToast } from './components/ui/Toast';
 import { requestPersistentStorage } from './utils/persistence';
+import { daysSince, shouldRemind, fireReminder } from './utils/reminder';
 
 export default function App() {
   const showToast = useToast();
@@ -60,7 +61,11 @@ export default function App() {
   // --- Init & Restore ---
   useEffect(() => {
     const savedHistory = localStorage.getItem('muscuGainHistory');
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    let parsedHistory = [];
+    if (savedHistory) {
+      parsedHistory = JSON.parse(savedHistory);
+      setHistory(parsedHistory);
+    }
     const savedRoutines = localStorage.getItem('muscuGainCustomRoutines');
     if (savedRoutines) setCustomRoutines(JSON.parse(savedRoutines));
     const savedBody = localStorage.getItem('muscuGainBodyAnalyses');
@@ -106,6 +111,21 @@ export default function App() {
     }
 
     requestPersistentStorage();
+
+    // --- Rappel de séance (opt-in) ---
+    if (
+      localStorage.getItem('muscuGainReminders') === '1' &&
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    ) {
+      const lastDateISO = parsedHistory[0]?.date;
+      const today = new Date().toISOString().slice(0, 10);
+      const lastRemindedDate = localStorage.getItem('muscuGainLastReminder');
+      if (shouldRemind({ lastDateISO, enabled: true, lastRemindedDate, today, now: Date.now() })) {
+        fireReminder(daysSince(lastDateISO));
+        localStorage.setItem('muscuGainLastReminder', today);
+      }
+    }
   }, []);
 
   // --- Auto-Save ---
