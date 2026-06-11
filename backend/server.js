@@ -30,12 +30,16 @@ app.post('/recognize-exercise', async (req, reply) => {
   const listText = list ? `\nListe autorisée (utilise les noms EXACTS): ${list.join(', ')}` : '';
 
   const prompt =
-    "Tu es coach de musculation. Voici la photo d'une machine de salle de sport. " +
-    "PRIORITÉ ABSOLUE: lis toute plaque, étiquette ou nom d'exercice écrit sur la machine et sers-t'en pour identifier l'exercice. " +
-    "Sinon, déduis-le de la forme de la machine. " +
-    "Donne les 3 exercices les plus probables, du plus probable au moins probable. " +
+    "Tu es un coach de musculation expert. Analyse la photo d'une machine ou d'un équipement de salle de sport. " +
+    "ÉTAPE 1 (OCR) — Lis et transcris TOUT texte visible : plaque, autocollant, nom d'exercice, schéma. " +
+    "ÉTAPE 2 — Identifie l'exercice. Si un nom d'exercice est lisible sur la machine, l'exercice correspondant DOIT être le candidat n°1 (ne te laisse pas tromper par la forme). " +
+    "Tu disposes d'une liste d'exercices connus" + (list ? '' : ' (vide)') + ". " +
+    "Si l'exercice correspond à un nom de la liste, utilise le nom EXACT de la liste. " +
+    "Si l'exercice N'EST PAS dans la liste, propose quand même son nom réel et correct (ne force pas un mauvais mapping). " +
+    "Pour CHAQUE candidat, indique le groupe musculaire principal parmi: chest, back, legs, shoulders, arms, abs. " +
+    "Donne les 3 exercices les plus probables, du plus au moins probable. " +
     "Réponds UNIQUEMENT en JSON, sans texte autour: " +
-    '{"label": "<texte d\'exercice lu sur la machine, ou null>", "candidates": [{"exercise": "<nom>", "confidence": <0 à 1>}]}.' +
+    '{"label":"<texte lu sur la machine, ou null>","candidates":[{"exercise":"<nom>","confidence":<0 à 1>,"muscleGroup":"<chest|back|legs|shoulders|arms|abs>","inList":<true si nom exact de la liste, sinon false>}]}.' +
     listText;
 
   const payload = {
@@ -44,7 +48,7 @@ app.post('/recognize-exercise', async (req, reply) => {
       { type: 'text', text: prompt },
       { type: 'image_url', image_url: { url: dataUrl } },
     ] }],
-    max_tokens: 256,
+    max_tokens: 320,
     temperature: 0.1,
   };
 
@@ -72,10 +76,21 @@ app.post('/recognize-exercise', async (req, reply) => {
   const parsed = extractJson(content);
   if (!parsed) return reply.send({ label: null, candidates: [] });
 
+  const validGroups = new Set(['chest', 'back', 'legs', 'shoulders', 'arms', 'abs']);
+  const allowedSet = list ? new Set(list) : null;
   let candidates = Array.isArray(parsed.candidates) ? parsed.candidates : [];
   candidates = candidates
     .filter((c) => c && c.exercise)
-    .map((c) => ({ exercise: String(c.exercise).trim(), confidence: Number(c.confidence) || null }))
+    .map((c) => {
+      const exercise = String(c.exercise).trim();
+      const g = String(c.muscleGroup || '').toLowerCase().trim();
+      return {
+        exercise,
+        confidence: Number(c.confidence) || null,
+        muscleGroup: validGroups.has(g) ? g : null,
+        inList: allowedSet ? allowedSet.has(exercise) : false,
+      };
+    })
     .slice(0, 3);
 
   return reply.send({ label: parsed.label ?? null, candidates });
