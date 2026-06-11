@@ -128,7 +128,7 @@ export default function Dashboard({
             </div>
           )}
 
-          {coachStatus !== 'loading' && coachStatus === 'error' && (
+          {coachStatus === 'error' && (
             <div className="space-y-3">
               <p className="text-sm text-amber-400">{coachError}</p>
               <Button onClick={runCoachAnalysis} className="py-2 text-sm">

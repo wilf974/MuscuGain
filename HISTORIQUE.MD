@@ -3,6 +3,24 @@
 Ce fichier contient un résumé concis des dernières conversations.
 
 ---
+### 11/06/2026 — P2 Coach IA (bilan, génération programme, croisement corps, suggestion charge)
+**Demande:** Suite roadmap P1→P2→P3. P2 = le différenciateur « l'IA digère le JSON ». 4 sous-features livrées.
+**Résultat:** Coach IA opérationnel + déployé (plan → subagent-driven TDD + review qualité approuvée).
+- **Backend** (`backend/server.js`, texte seul, NIM `MODEL`, non médical) :
+  - `POST /coach-analysis` `{summary, bodyAnalysis?}` → `{overview, progression[], plateaus[], weeklyVolume, balance, deload, bodyCross}`. `bodyAnalysis` (analyse corporelle) → `bodyCross` = croisement corps×training.
+  - `POST /generate-program` `{objective, catalog}` → `{name, exercises:[{name,targetSets,targetReps,restSeconds}]}`, **noms validés contre le catalogue** (serveur + client), objectif tronqué 300 char.
+- **Front** :
+  - `utils/coach.core.js` (purs, 5 tests) : `buildHistorySummary` (résumé compact cap 15 exos/30 séances, trend, muscleVolume, weeklyFrequency), `normalizeCoachAnalysis`, `normalizeGeneratedProgram` (filtre noms valides), `suggestLoad` (+2.5 kg si reps cible atteintes, arrondi 0.5).
+  - `utils/coach.js` (IO) : `fetchCoachAnalysis`, `generateProgram`, `CoachError`. `data/exercises.js` : `EXERCISE_CATEGORY`/`categoryOf`.
+  - **Dashboard** : carte « Coach IA » (bouton « Demander un bilan » → bilan structuré, **cache 1/jour** `muscuGainCoachAnalysis`, « Rafraîchir ») ; bouton « ✨ Générer par IA ».
+  - **GenerateProgramModal** : objectif → aperçu éditable → enregistrer (toast).
+  - **Workout** : puce « Suggéré : X kg » par exercice, clic → remplit séries non faites.
+- **Review qualité** (sous-agent) : approuvé, 0 critical/important. Défense double sur les noms d'exos (serveur+client), prompts bornés, parité erreurs avec handlers existants, pas de PII loggée. Fix mineur appliqué (condition redondante Dashboard).
+- **Vérifs** : 20 tests core OK, `npm run build` OK, 2 containers `Up (healthy)`, e2e `/api/coach-analysis` → bilan complet, `/api/generate-program` → programme aux noms validés (HTTP 200).
+**Fichiers créés:** `src/utils/coach.core.js` (+test), `src/utils/coach.js`, `src/components/modals/GenerateProgramModal.jsx`, plan `docs/superpowers/plans/2026-06-11-p2-coach-ia.md`
+**Fichiers modifiés:** `backend/server.js`, `src/data/exercises.js`, `src/views/Dashboard.jsx`, `src/App.jsx`, `src/views/Workout.jsx`
+
+---
 ### 11/06/2026 — P1 Confort de séance (7 quick-wins UX)
 **Demande:** Roadmap d'amélioration (UI/UX/backend/fonctionnalités) puis exécution P1→P2→P3. P1 livré.
 **Résultat:** 7 features confort livrées + déployées (workflow superpowers : plan → subagent-driven + review qualité).

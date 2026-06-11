@@ -20,14 +20,14 @@ Mise à jour : 2026-06-11. Vision : **le coach de musculation dans la poche d'un
 - [x] **Toast de confirmation** — `ToastProvider` + `useToast` (save/édit/suppr/import).
 - [x] **Notes par séance** — textarea en Cooldown, stockée (`entry.notes`), affichée dans l'histo détaillé.
 
-## Phase 2 — Coach IA (le différenciateur) 🧠
+## Phase 2 — Coach IA (le différenciateur) 🧠 ✅ LIVRÉ 2026-06-11
 *Effort : moyen. Valeur : cœur de la vision « l'IA a accès au JSON ».*
 
-- [ ] **Bilan IA de l'historique** : endpoint `POST /coach-analysis` — l'app envoie l'historique JSON (texte, pas de photo) → LLM → bilan : progression par groupe musculaire, plateaux détectés, volume hebdo, équilibre push/pull/jambes, suggestion de deload. Affiché dans le Dashboard (remplace les tips statiques rotatifs du « Conseil du Coach »).
-- [ ] **Croisement corps × training** : l'analyse corporelle (morphotype, faiblesses) croisée avec l'historique réel → « tes épaules sont en retard ET tu ne les travailles que 1×/semaine → ajoute X ».
-- [ ] **Génération de programme par IA** : décrire son objectif en une phrase (« 3 séances/semaine, prise de masse, débutant ») → routine complète générée (exercices de `EXERCISES_DB`), éditable avant sauvegarde.
-- [ ] **Suggestion de charge** : avant chaque série, l'app propose le poids basé sur les dernières perfs + cible de progression (règle simple côté front d'abord, IA ensuite).
-- Garde-fous : rate-limit dédié, taille payload bornée, prompt non médical, cache du bilan (1/jour max).
+- [x] **Bilan IA de l'historique** : `POST /coach-analysis` — résumé compact de l'historique (`buildHistorySummary`, pas le brut) → LLM → bilan (progression, plateaux, volume hebdo, équilibre, deload). Carte « Coach IA » sur le Dashboard, cache 1/jour.
+- [x] **Croisement corps × training** : l'analyse corporelle (faiblesses) passée à `/coach-analysis` → champ `bodyCross` du bilan.
+- [x] **Génération de programme par IA** : `POST /generate-program` — objectif en une phrase → routine (noms validés contre `EXERCISES_DB`), aperçu éditable (`GenerateProgramModal`) avant sauvegarde.
+- [x] **Suggestion de charge** : puce « Suggéré : X kg » par exercice dans Workout (`suggestLoad`, +2.5 kg si reps cible atteintes), clic → remplit les séries non faites.
+- Garde-fous : payload borné (résumé cap 15 exos/30 séances, objectif tronqué 300 char), noms validés serveur+client, prompt non médical, cache bilan 1/jour. Modèle : NIM `nemotron-nano-12b-v2-vl` (texte).
 
 ## Phase 3 — PWA & résilience des données 📱
 *Effort : moyen. Valeur : fiabilité (le localStorage est fragile) + usage salle sans réseau.*
