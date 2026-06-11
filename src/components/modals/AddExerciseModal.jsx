@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { PlusCircle, Camera, Loader2, AlertCircle, Image as ImageIcon } from 'lucide-react';
 import Button from '../ui/Button';
-import { EXERCISES_DB, MUSCLE_LABELS } from '../../data/exercises';
-import { recognizeMachine, flattenExercises, RecognizeError } from '../../utils/recognizeMachine';
+import { MUSCLE_LABELS } from '../../data/exercises';
+import { recognizeMachine, RecognizeError } from '../../utils/recognizeMachine';
+import { loadCustomExercises, addCustomExercise, allKnownNames, mergedCatalog, categoryFromGroup } from '../../data/customExercises';
 
 export default function AddExerciseModal({ isOpen, onClose, onSelect, existingExercises = [] }) {
   const cameraInputRef = useRef(null);
@@ -10,9 +11,12 @@ export default function AddExerciseModal({ isOpen, onClose, onSelect, existingEx
   const [phase, setPhase] = useState('idle'); // idle | loading | results | error
   const [result, setResult] = useState(null); // { label, candidates }
   const [errorMsg, setErrorMsg] = useState('');
+  const [custom, setCustom] = useState(() => loadCustomExercises());
 
   if (!isOpen) return null;
   const existingExerciseNames = existingExercises.map((ex) => (typeof ex === 'string' ? ex : ex.name));
+  const catalog = mergedCatalog(custom);
+  const known = new Set(allKnownNames(custom));
 
   const resetReco = () => {
     setPhase('idle');
@@ -32,7 +36,7 @@ export default function AddExerciseModal({ isOpen, onClose, onSelect, existingEx
     setPhase('loading');
     setErrorMsg('');
     try {
-      const r = await recognizeMachine(file, flattenExercises(EXERCISES_DB));
+      const r = await recognizeMachine(file, allKnownNames(custom));
       setResult(r);
       setPhase('results');
     } catch (err) {
@@ -41,10 +45,14 @@ export default function AddExerciseModal({ isOpen, onClose, onSelect, existingEx
     }
   };
 
-  const pickCandidate = (exerciseName) => {
-    if (existingExerciseNames.includes(exerciseName)) return;
+  const pickCandidate = (c) => {
+    if (existingExerciseNames.includes(c.exercise)) return;
+    if (!known.has(c.exercise)) {
+      const updated = addCustomExercise(c.exercise, categoryFromGroup(c.muscleGroup));
+      setCustom(updated);
+    }
     resetReco();
-    onSelect(exerciseName);
+    onSelect(c.exercise);
   };
 
   return (
@@ -102,20 +110,29 @@ export default function AddExerciseModal({ isOpen, onClose, onSelect, existingEx
             <div className="space-y-2">
               {result.candidates.map((c) => {
                 const added = existingExerciseNames.includes(c.exercise);
+                const isNew = !known.has(c.exercise);
+                const groupLabel = c.muscleGroup ? MUSCLE_LABELS[categoryFromGroup(c.muscleGroup)] : null;
                 const pct = c.confidence != null ? Math.round(c.confidence * 100) : null;
                 return (
                   <button
                     key={c.exercise}
-                    onClick={() => pickCandidate(c.exercise)}
+                    onClick={() => pickCandidate(c)}
                     disabled={added}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
                       added ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed' : 'bg-slate-800 hover:bg-blue-600/30 text-slate-200'
                     }`}
                   >
                     <div className="flex items-center justify-between text-sm">
-                      <span>{c.exercise} {added && <span className="text-xs text-slate-600 ml-1">✓ Ajouté</span>}</span>
+                      <span className="flex items-center gap-1.5">
+                        {c.exercise}
+                        {added && <span className="text-xs text-slate-600">✓ Ajouté</span>}
+                        {!added && isNew && (
+                          <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-0.5">+ nouveau</span>
+                        )}
+                      </span>
                       {pct != null && <span className="text-[11px] text-slate-400 tabular-nums">{pct}%</span>}
                     </div>
+                    {groupLabel && <p className="text-[10px] text-slate-500 mt-0.5">{groupLabel}</p>}
                     {pct != null && (
                       <div className="mt-1 h-1 rounded-full bg-slate-700 overflow-hidden">
                         <div className="h-full bg-blue-500" style={{ width: `${pct}%` }} />
@@ -131,9 +148,9 @@ export default function AddExerciseModal({ isOpen, onClose, onSelect, existingEx
 
         {/* Liste manuelle (toujours dispo) */}
         <div className="space-y-3">
-          {Object.entries(EXERCISES_DB).map(([category, exercises]) => (
+          {catalog.map(({ category, label, exercises }) => (
             <div key={category}>
-              <h4 className="text-sm font-bold text-slate-400 uppercase mb-2">{MUSCLE_LABELS[category]}</h4>
+              <h4 className="text-sm font-bold text-slate-400 uppercase mb-2">{label}</h4>
               <div className="space-y-1">
                 {exercises.map((exerciseName) => {
                   const isAlreadyAdded = existingExerciseNames.includes(exerciseName);
