@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { X, Plus, Check, Play, Dumbbell, Trash2 } from 'lucide-react';
+import { X, Plus, Check, Play, Dumbbell, Trash2, TrendingUp } from 'lucide-react';
 import Button from '../components/ui/Button';
 import VideoModal from '../components/modals/VideoModal';
 import AddExerciseModal from '../components/modals/AddExerciseModal';
 import { VIDEO_MAPPING } from '../data/videos';
 import { EXERCISES_DB } from '../data/exercises';
 import { formatTime } from '../utils/format';
+import { suggestLoad } from '../utils/coach.core';
 
 export default function Workout({
   activeRoutine,
@@ -29,6 +30,17 @@ export default function Workout({
     const newData = { ...workoutData };
     newData[exercise] = [...newData[exercise]];
     newData[exercise][index] = { ...newData[exercise][index], [field]: value };
+    setWorkoutData(newData);
+  };
+
+  // Remplit le poids de toutes les séries non terminées d'un exercice avec la charge suggérée.
+  const fillSuggestedWeight = (exercise, weight) => {
+    const sets = workoutData[exercise];
+    if (!Array.isArray(sets)) return;
+    const newData = { ...workoutData };
+    newData[exercise] = sets.map((set) =>
+      set.done ? set : { ...set, weight: String(weight) }
+    );
     setWorkoutData(newData);
   };
 
@@ -121,6 +133,18 @@ export default function Workout({
           const lastLog = getLastLog(exName);
           const videoId = VIDEO_MAPPING[exName];
 
+          // Reps cible : entrée de routine, sinon reps de la 1ère série, sinon 8.
+          const routineReps =
+            exerciseEntry && typeof exerciseEntry === 'object' ? exerciseEntry.targetReps : undefined;
+          const firstSetReps = workoutData[exName]?.[0]?.reps;
+          const targetReps = Number(routineReps) || Number(firstSetReps) || 8;
+          const suggestion = suggestLoad(lastLog, targetReps);
+          // N'afficher que si la suggestion diffère d'un poids déjà saisi (1ère série non terminée).
+          const firstActive = workoutData[exName]?.find((s) => !s.done);
+          const showSuggestion =
+            suggestion &&
+            (!firstActive || String(firstActive.weight) !== String(suggestion.weight));
+
           return (
             <div key={exIndex} className="fade-in">
               <div className="flex items-start gap-3 mb-3">
@@ -151,11 +175,28 @@ export default function Workout({
                       {exName}
                     </h3>
                   </div>
-                  {lastLog && (
-                    <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full inline-block">
-                      Dernier: {lastLog.weight}kg x {lastLog.reps}
-                    </span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {lastLog && (
+                      <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full inline-block">
+                        Dernier: {lastLog.weight}kg x {lastLog.reps}
+                      </span>
+                    )}
+                    {showSuggestion && (
+                      <button
+                        type="button"
+                        onClick={() => fillSuggestedWeight(exName, suggestion.weight)}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 border transition-colors active:scale-95 ${
+                          suggestion.bump
+                            ? 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20'
+                            : 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
+                        }`}
+                        title="Appliquer cette charge aux séries restantes"
+                      >
+                        <TrendingUp size={10} />
+                        Suggéré : {suggestion.weight} kg
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
