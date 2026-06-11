@@ -11,11 +11,21 @@ Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (D
 - Deploy : `docker compose up -d --build` (Dockerfile multi-stage : `npm ci` + `vite build` → nginx).
 
 ## Structure `src/`
-- `App.jsx` — état global (vues, `customRoutines`, historique, timers), persistance localStorage, modales.
-- `views/` — Dashboard, SessionSetup, Warmup, Workout, Cooldown, History, CreateRoutine.
-- `components/ui/` (Button, Card), `components/modals/` (Confirmation, AddExercise, Video, **ImportRoutine**), NavBar, InstallPrompt.
+- `App.jsx` — état global (vues, `customRoutines`, historique, `bodyAnalyses`, timers), persistance localStorage, modales.
+- `views/` — Dashboard, SessionSetup, Warmup, Workout, Cooldown, History, CreateRoutine, **BodyAnalysis**.
+- `components/ui/` (Button, Card, **VolumeChart**), `components/modals/` (Confirmation, AddExercise, Video, ImportRoutine), NavBar (4 onglets : Accueil, Analyse, [FAB séance], Historique), InstallPrompt.
 - `data/` — exercises.js (`EXERCISES_DB` par groupe + `MUSCLE_LABELS`), routines.js (`DEFAULT_ROUTINES`), videos.js.
-- `hooks/` (useAlarm), `utils/` (format.js, **parseWorkbook.js** + **parseWorkbook.core.js**).
+- `hooks/` (useAlarm), `utils/` (format.js, parseWorkbook.{core.,}js, recognizeMachine.{core.,}js, **records.core.js**, **analyzeBody.{core.,}js**).
+
+## Historique & records
+- History : accordéon par séance (poids/reps par série), graphique SVG volume (`VolumeChart`, 30 dernières), badge 🏆 sur séries record.
+- Records PR (`utils/records.core.js`) : `computePRs`/`detectNewPRs`, PR = poids max sur série `done` par exercice. Bannière 🏆 dans Cooldown.
+- Pas d'export/import JSON (retiré : illisible néophyte, données non exposées).
+
+## Analyse corporelle (onglet « Analyse », `view 'body'`)
+- Backend `POST /analyze-body` (`backend/server.js`) : photo → NVIDIA NIM → `{morphotype, balance, bodyFatRange, strengths[], weaknesses[], trainingAdvice[], evolutionNote}`. Coach fitness, **non médical**. Photo non journalisée.
+- Front : `utils/analyzeBody.{core.,}js` (`normalizeBodyAnalysis`, `analyzeBody`, `AnalyzeBodyError`), vue `BodyAnalysis.jsx` (consentement, capture caméra/galerie, résultats, timeline).
+- **Vie privée** : photo envoyée à l'IA mais **jamais conservée** (ni serveur ni localStorage). Seul le résultat texte stocké : `localStorage muscuGainBodyAnalyses`. Consentement : `muscuGainBodyConsent`. Disclaimer non médical affiché.
 
 ## Modèle programme (routine)
 `{ id, name, desc, exercises: [{ name, targetSets, targetReps, startingWeight, restSeconds? }], isCustom }`
