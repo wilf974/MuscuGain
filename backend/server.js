@@ -157,6 +157,112 @@ app.post('/analyze-body', async (req, reply) => {
   });
 });
 
+app.post('/coach-analysis', async (req, reply) => {
+  if (!API_KEY) return reply.code(503).send({ error: 'Clé NVIDIA non configurée' });
+  const { summary, bodyAnalysis } = req.body || {};
+  if (!summary || typeof summary !== 'object') return reply.code(400).send({ error: 'résumé manquant' });
+
+  let bodyText = '';
+  if (bodyAnalysis && typeof bodyAnalysis === 'object') {
+    const b = bodyAnalysis;
+    bodyText = `\nAnalyse corporelle récente: morphotype=${b.morphotype || '?'}, faiblesses=${(b.weaknesses || []).join('; ') || '?'}. ` +
+      "Croise-la avec l'entraînement réel pour 'bodyCross'.";
+  }
+
+  const prompt =
+    "Tu es un coach de musculation. Voici un résumé chiffré de l'historique d'entraînement d'une personne (JSON). " +
+    "Analyse-le et donne un bilan motivant et concret, NON médical. " +
+    "Évalue: progression (exercices qui montent), plateaux (stagnation), volume hebdo, équilibre entre groupes musculaires (push/pull/jambes), et si un deload est utile. " +
+    "Réponds UNIQUEMENT en JSON: " +
+    '{"overview":"<2 phrases>","progression":["..."],"plateaus":["..."],"weeklyVolume":"<court>","balance":"<court>","deload":"<court>","bodyCross":"<vide si pas d\'analyse corporelle>"}. ' +
+    'Résumé: ' + JSON.stringify(summary) + bodyText;
+
+  const payload = {
+    model: MODEL,
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 700,
+    temperature: 0.3,
+  };
+
+  let res;
+  try {
+    res = await fetch(NVIDIA_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000),
+    });
+  } catch (e) {
+    req.log.error({ err: String(e) }, 'NVIDIA fetch failed (coach)');
+    return reply.code(504).send({ error: 'Délai dépassé côté modèle' });
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    req.log.error({ status: res.status, body: t.slice(0, 300) }, 'NVIDIA error (coach)');
+    return reply.code(502).send({ error: 'Erreur du modèle', status: res.status });
+  }
+  const out = await res.json();
+  const parsed = extractJson(out?.choices?.[0]?.message?.content || '');
+  if (!parsed) return reply.send({});
+  const str = (v) => (typeof v === 'string' ? v.trim() : '');
+  const arr = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()).slice(0, 6) : []);
+  return reply.send({
+    overview: str(parsed.overview), progression: arr(parsed.progression), plateaus: arr(parsed.plateaus),
+    weeklyVolume: str(parsed.weeklyVolume), balance: str(parsed.balance), deload: str(parsed.deload), bodyCross: str(parsed.bodyCross),
+  });
+});
+
+app.post('/generate-program', async (req, reply) => {
+  if (!API_KEY) return reply.code(503).send({ error: 'Clé NVIDIA non configurée' });
+  const { objective, catalog } = req.body || {};
+  if (!objective || typeof objective !== 'string') return reply.code(400).send({ error: 'objectif manquant' });
+
+  const names = catalog && typeof catalog === 'object'
+    ? Object.values(catalog).flat().filter((x) => typeof x === 'string')
+    : [];
+  if (!names.length) return reply.code(400).send({ error: 'catalogue manquant' });
+
+  const prompt =
+    "Tu es un coach de musculation. Crée un programme adapté à cet objectif: \"" + objective.slice(0, 300) + "\". " +
+    "Choisis 5 à 8 exercices UNIQUEMENT dans cette liste (noms EXACTS): " + names.join(', ') + ". " +
+    "Pour chaque exercice donne des séries et répétitions cohérentes avec l'objectif. " +
+    "Réponds UNIQUEMENT en JSON: " +
+    '{"name":"<nom du programme>","exercises":[{"name":"<nom exact de la liste>","targetSets":<n>,"targetReps":<n>,"restSeconds":<s>}]}.';
+
+  const payload = { model: MODEL, messages: [{ role: 'user', content: prompt }], max_tokens: 600, temperature: 0.4 };
+  let res;
+  try {
+    res = await fetch(NVIDIA_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000),
+    });
+  } catch (e) {
+    req.log.error({ err: String(e) }, 'NVIDIA fetch failed (generate)');
+    return reply.code(504).send({ error: 'Délai dépassé côté modèle' });
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    req.log.error({ status: res.status, body: t.slice(0, 300) }, 'NVIDIA error (generate)');
+    return reply.code(502).send({ error: 'Erreur du modèle', status: res.status });
+  }
+  const out = await res.json();
+  const parsed = extractJson(out?.choices?.[0]?.message?.content || '');
+  if (!parsed) return reply.send({ name: '', exercises: [] });
+  // Validation des noms contre le catalogue
+  const valid = new Set(names);
+  const exercises = Array.isArray(parsed.exercises) ? parsed.exercises
+    .filter((e) => e && valid.has(String(e.name).trim()))
+    .map((e) => ({
+      name: String(e.name).trim(),
+      targetSets: Math.max(1, parseInt(e.targetSets) || 3),
+      targetReps: Math.max(1, parseInt(e.targetReps) || 10),
+      ...(parseInt(e.restSeconds) > 0 ? { restSeconds: parseInt(e.restSeconds) } : {}),
+    })).slice(0, 12) : [];
+  return reply.send({ name: typeof parsed.name === 'string' ? parsed.name.trim() : '', exercises });
+});
+
 app.listen({ port: PORT, host: '0.0.0.0' })
   .then(() => app.log.info(`muscugain-ai up on :${PORT} (model ${MODEL})`))
   .catch((e) => { app.log.error(e); process.exit(1); });
