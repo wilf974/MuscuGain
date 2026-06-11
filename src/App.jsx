@@ -12,6 +12,7 @@ import Warmup from './views/Warmup';
 import Workout from './views/Workout';
 import Cooldown from './views/Cooldown';
 import History from './views/History';
+import BodyAnalysis from './views/BodyAnalysis';
 
 export default function App() {
   const [view, setView] = useState('dashboard');
@@ -19,6 +20,7 @@ export default function App() {
   const [workoutData, setWorkoutData] = useState({});
   const [history, setHistory] = useState([]);
   const [customRoutines, setCustomRoutines] = useState([]);
+  const [bodyAnalyses, setBodyAnalyses] = useState([]);
   const [lastFinishedSession, setLastFinishedSession] = useState(null);
 
   // Confirmation Modal
@@ -53,6 +55,8 @@ export default function App() {
     if (savedHistory) setHistory(JSON.parse(savedHistory));
     const savedRoutines = localStorage.getItem('muscuGainCustomRoutines');
     if (savedRoutines) setCustomRoutines(JSON.parse(savedRoutines));
+    const savedBody = localStorage.getItem('muscuGainBodyAnalyses');
+    if (savedBody) setBodyAnalyses(JSON.parse(savedBody));
 
     const savedSession = localStorage.getItem('muscuGainActiveSession');
     if (savedSession) {
@@ -315,6 +319,13 @@ export default function App() {
     localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
   };
 
+  // --- Analyse corporelle ---
+  const addBodyAnalysis = (entry) => {
+    const updated = [entry, ...bodyAnalyses];
+    setBodyAnalyses(updated);
+    localStorage.setItem('muscuGainBodyAnalyses', JSON.stringify(updated));
+  };
+
   // --- Resume ---
   const canResumeSession = () => {
     if (!lastFinishedSession) return false;
@@ -440,6 +451,9 @@ export default function App() {
           history={history}
           requestDeleteHistory={requestDeleteHistory}
         />
+      )}
+      {view === 'body' && (
+        <BodyAnalysis bodyAnalyses={bodyAnalyses} addBodyAnalysis={addBodyAnalysis} />
       )}
 
       {!isSessionView && <NavBar view={view} setView={setView} activeRoutine={activeRoutine} />}

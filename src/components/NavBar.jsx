@@ -1,4 +1,4 @@
-import { LayoutDashboard, Dumbbell, History } from 'lucide-react';
+import { LayoutDashboard, Dumbbell, History, ScanLine } from 'lucide-react';
 
 export default function NavBar({ view, setView, activeRoutine }) {
   return (
@@ -26,6 +26,13 @@ export default function NavBar({ view, setView, activeRoutine }) {
             <Dumbbell size={24} />
           </button>
         </div>
+        <button
+          onClick={() => setView('body')}
+          className={`flex flex-col items-center gap-1 transition-colors ${view === 'body' ? 'text-blue-500' : 'text-slate-500'}`}
+        >
+          <ScanLine size={20} />
+          <span className="text-[10px] font-medium">Analyse</span>
+        </button>
         <button
           onClick={() => setView('history')}
           className={`flex flex-col items-center gap-1 transition-colors ${view === 'history' ? 'text-blue-500' : 'text-slate-500'}`}
