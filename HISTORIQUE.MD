@@ -3,6 +3,22 @@
 Ce fichier contient un résumé concis des dernières conversations.
 
 ---
+### 11/06/2026 — Reco machine : OCR amélioré + exercices hors-liste (catalogue perso)
+**Demande:** La reco machine se trompait (photo du nom « dips » d'une machine triceps → sortait « développé couché »). + idée user : que l'IA ajoute l'exo s'il n'existe pas dans la liste.
+**Résultat:** Reco refondue + catalogue perso persistant (plan → subagent-driven TDD + review approuvée).
+- **Cause racine** : (1) image trop dégradée pour l'OCR (`768px/q0.72`) → texte de plaque illisible → devine par la forme ; (2) reco **contrainte** à `EXERCISES_DB` → forcée de mapper sur un exo existant faux.
+- **Fixes** :
+  - Image machine `768px/0.72` → **`1280px/0.85`** (texte lisible). Body analysis garde 768 (défaut inchangé).
+  - **Prompt OCR-first** 2 étapes (transcrire le texte → exo n°1 = ce texte) + **autorise un nom hors-liste** + `muscleGroup` par candidat + `inList`. `max_tokens` 256→320.
+  - **Catalogue perso** `src/data/customExercises.js` (`localStorage.muscuGainCustomExercises` `[{name,category}]`) : `categoryFromGroup` (FR/EN→clé), `dedupeAdd` (insensible casse), `mergedCatalog`, `allKnownNames`. Tests purs.
+  - **AddExerciseModal** : reco sur `allKnownNames` (catalogue+perso), badge « + nouveau » sur les hors-liste, choix d'un nouveau → ajouté au catalogue perso (avec groupe musculaire) + à la séance. Liste manuelle fusionnée.
+  - **CreateRoutine** : picker fusionné (exos perso sélectionnables).
+- **Review qualité** : approuvée, 0 critical/important. Fix appliqué (minor #1) : collision casse custom↔builtin → `addCustomExercise`/`mergedCatalog` ignorent les noms déjà dans le catalogue intégré (`BUILTIN_LOWER`).
+- **Vérifs** : tests core OK, `npm run build` OK, 2 containers healthy, e2e `/api/recognize-exercise` forme `{label, candidates:[{exercise,confidence,muscleGroup,inList}]}` OK.
+**Fichiers créés:** `src/data/customExercises.js`+`.core.test.js`, plan `docs/superpowers/plans/2026-06-11-reco-machine-hors-liste.md`
+**Fichiers modifiés:** `backend/server.js`, `src/utils/recognizeMachine.{core.,}js`+test, `src/components/modals/AddExerciseModal.jsx`, `src/views/CreateRoutine.jsx`
+
+---
 ### 11/06/2026 — P3 PWA & résilience (offline, installable, persist, rappels)
 **Demande:** Fin de la roadmap P1→P2→P3. P3 = fiabilité données + usage salle hors-ligne. Livré sauf migration IndexedDB (désélectionnée, reportée).
 **Résultat:** App installable + offline + protection localStorage + rappels (plan → subagent-driven + review qualité approuvée).

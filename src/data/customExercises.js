@@ -3,6 +3,9 @@ import { EXERCISES_DB, MUSCLE_LABELS } from './exercises.js';
 const KEY = 'muscuGainCustomExercises';
 const VALID = ['chest', 'back', 'legs', 'shoulders', 'arms', 'abs'];
 
+// Noms du catalogue intégré, en minuscules (dédup insensible à la casse custom↔builtin).
+const BUILTIN_LOWER = new Set(Object.values(EXERCISES_DB).flat().map((n) => n.toLowerCase()));
+
 const GROUP_TO_CAT = {
   chest: 'chest', pectoraux: 'chest', pecs: 'chest', poitrine: 'chest',
   back: 'back', dos: 'back',
@@ -36,7 +39,10 @@ export function loadCustomExercises() {
 }
 
 export function addCustomExercise(name, category) {
-  const updated = dedupeAdd(loadCustomExercises(), name, category);
+  const list = loadCustomExercises();
+  // Déjà dans le catalogue intégré (même à la casse près) → ne pas créer de doublon perso.
+  if (BUILTIN_LOWER.has(String(name || '').trim().toLowerCase())) return list;
+  const updated = dedupeAdd(list, name, category);
   try { localStorage.setItem(KEY, JSON.stringify(updated)); } catch { /* quota */ }
   return updated;
 }
@@ -48,12 +54,14 @@ export function allKnownNames(custom = loadCustomExercises()) {
 
 // Catalogue fusionné pour le picker : [{ category, label, exercises:[names] }] ; 'other' en dernier.
 export function mergedCatalog(custom = loadCustomExercises()) {
+  // Ignore les exos perso qui collisionnent (casse près) avec le catalogue intégré.
+  const cleanCustom = custom.filter((e) => !BUILTIN_LOWER.has(String(e.name || '').toLowerCase()));
   const out = Object.entries(EXERCISES_DB).map(([category, exercises]) => ({
     category,
     label: MUSCLE_LABELS[category] || category,
-    exercises: [...exercises, ...custom.filter((e) => e.category === category).map((e) => e.name)],
+    exercises: [...exercises, ...cleanCustom.filter((e) => e.category === category).map((e) => e.name)],
   }));
-  const others = custom.filter((e) => !VALID.includes(e.category)).map((e) => e.name);
+  const others = cleanCustom.filter((e) => !VALID.includes(e.category)).map((e) => e.name);
   if (others.length) out.push({ category: 'other', label: 'Autres', exercises: others });
   return out;
 }

@@ -38,6 +38,10 @@ Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (D
 - Auto-détection ligne d'en-tête (si B et C non numériques sur la 1ère ligne). Conflit de nom → **écrase** l'existant. Aperçu avec cases à cocher avant création.
 - Lib : `read-excel-file@9` (import depuis `read-excel-file/browser`). Logique de parsing pure et testable dans `parseWorkbook.core.js`.
 
+## Reco machine (photo → exercice)
+- Photo `1280px/0.85` (OCR lisible). Prompt OCR-first : lit le texte de la plaque → exo n°1. Peut proposer un exo **hors-liste** (avec `muscleGroup`).
+- Catalogue perso `src/data/customExercises.js` (`localStorage.muscuGainCustomExercises`) : exos hors-liste choisis y sont ajoutés (classés par groupe musculaire), enrichissent la liste manuelle (AddExerciseModal + CreateRoutine via `mergedCatalog`) et l'`allowedExercises` des prochaines reco (`allKnownNames`). Dédup insensible à la casse, collisions avec le catalogue intégré ignorées.
+
 ## Backend IA vision (`backend/`)
 - Fastify (ESM, `node server.js`), `POST /recognize-exercise` `{image: dataURL|base64, allowedExercises?: string[]}` → `{label, candidates: [{exercise, confidence}]×3}`. `GET /health`. Rate-limit 30/min, bodyLimit 8MB.
 - Modèle : **`nvidia/nemotron-nano-12b-v2-vl`** (NVIDIA NIM). Choisi par benchmark (cf. HISTORIQUE 09/06) : llama-3.2-90b refuse les photos avec personnes, llama-4-maverick timeout. Surcharge via `NVIDIA_MODEL`.
