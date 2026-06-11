@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload } from 'lucide-react';
+import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Pencil, Copy } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { DEFAULT_ROUTINES } from '../data/routines';
@@ -16,6 +16,9 @@ export default function Dashboard({
   resumeLastSession,
   canResumeSession,
   onImportClick,
+  onCreateClick,
+  onEditRoutine,
+  onDuplicateRoutine,
 }) {
   const coachAdvice = useMemo(() => {
     if (history.length === 0) {
@@ -125,7 +128,7 @@ export default function Dashboard({
           <button onClick={onImportClick} className="bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-slate-600">
             <Upload size={14} /> Importer
           </button>
-          <button onClick={() => setView('create')} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-500/30">
+          <button onClick={onCreateClick} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-500/30">
             <Plus size={14} /> Créer
           </button>
         </div>
@@ -142,6 +145,12 @@ export default function Dashboard({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-bold text-white">{routine.name}</h3>
+                      <button type="button" onClick={() => onEditRoutine(routine)} className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button type="button" onClick={() => onDuplicateRoutine(routine)} className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
+                        <Copy size={14} />
+                      </button>
                       <button type="button" onClick={() => requestDeleteRoutine(routine.id)} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors">
                         <Trash2 size={14} />
                       </button>

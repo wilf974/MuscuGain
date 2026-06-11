@@ -22,6 +22,7 @@ export default function App() {
   const [customRoutines, setCustomRoutines] = useState([]);
   const [bodyAnalyses, setBodyAnalyses] = useState([]);
   const [lastFinishedSession, setLastFinishedSession] = useState(null);
+  const [editingRoutine, setEditingRoutine] = useState(null);
 
   // Confirmation Modal
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, id: null, title: '', message: '' });
@@ -319,6 +320,28 @@ export default function App() {
     localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
   };
 
+  const startEditRoutine = (routine) => {
+    setEditingRoutine(routine);
+    setView('create');
+  };
+
+  const startCreateRoutine = () => {
+    setEditingRoutine(null);
+    setView('create');
+  };
+
+  const duplicateRoutine = (routine) => {
+    const copy = {
+      ...routine,
+      id: 'custom_' + Date.now(),
+      name: `${routine.name} (copie)`,
+      isCustom: true,
+    };
+    const updated = [copy, ...customRoutines];
+    setCustomRoutines(updated);
+    localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+  };
+
   // --- Analyse corporelle ---
   const addBodyAnalysis = (entry) => {
     const updated = [entry, ...bodyAnalyses];
@@ -395,13 +418,17 @@ export default function App() {
           resumeLastSession={resumeLastSession}
           canResumeSession={canResumeSession}
           onImportClick={() => setImportModalOpen(true)}
+          onCreateClick={startCreateRoutine}
+          onEditRoutine={startEditRoutine}
+          onDuplicateRoutine={duplicateRoutine}
         />
       )}
       {view === 'create' && (
         <CreateRoutine
-          setView={setView}
+          setView={(v) => { setEditingRoutine(null); setView(v); }}
           customRoutines={customRoutines}
           setCustomRoutines={setCustomRoutines}
+          editingRoutine={editingRoutine}
         />
       )}
       {view === 'setup' && (
