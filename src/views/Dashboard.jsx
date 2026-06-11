@@ -304,18 +304,18 @@ export default function Dashboard({
             <div className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Mes Programmes</div>
             {customRoutines.map((routine) => (
               <Card key={routine.id} className="relative overflow-hidden group border-blue-500/30 bg-slate-800/80">
-                <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-400"><User size={60} /></div>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
+                <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-400 pointer-events-none"><User size={60} /></div>
+                <div className="relative z-10 flex justify-between items-start mb-2">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-xl font-bold text-white">{routine.name}</h3>
-                      <button type="button" onClick={() => onEditRoutine(routine)} className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
+                      <h3 className="text-xl font-bold text-white truncate min-w-0">{routine.name}</h3>
+                      <button type="button" onClick={() => onEditRoutine(routine)} className="shrink-0 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
                         <Pencil size={14} />
                       </button>
-                      <button type="button" onClick={() => onDuplicateRoutine(routine)} className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
+                      <button type="button" onClick={() => onDuplicateRoutine(routine)} className="shrink-0 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
                         <Copy size={14} />
                       </button>
-                      <button type="button" onClick={() => requestDeleteRoutine(routine.id)} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors">
+                      <button type="button" onClick={() => requestDeleteRoutine(routine.id)} className="shrink-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -333,7 +333,7 @@ export default function Dashboard({
         <div className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Exemples</div>
         {DEFAULT_ROUTINES.map((routine) => (
           <Card key={routine.id} className="relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Activity size={60} /></div>
+            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Activity size={60} /></div>
             <h3 className="text-xl font-bold text-white">{routine.name}</h3>
             <p className="text-slate-400 text-sm mb-4 line-clamp-1">{routine.desc}</p>
             <Button fullWidth onClick={() => triggerSetup(routine)}>
