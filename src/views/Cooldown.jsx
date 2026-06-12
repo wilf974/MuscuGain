@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Wind, X, Trophy } from 'lucide-react';
+import { Wind, X, Trophy, Dumbbell } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { formatTime, formatDuration, calculateVolume } from '../utils/format';
-import { detectNewPRs } from '../utils/records.core';
+import { detectNewPRs, detectRepPRs } from '../utils/records.core';
 
 export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, workoutData, saveAndExit, history }) {
   const newPRs = detectNewPRs(history || [], { exercises: workoutData });
+  const repPRs = detectRepPRs(history || [], { exercises: workoutData });
   const [notes, setNotes] = useState('');
 
   return (
@@ -27,6 +28,21 @@ export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, w
               <li key={pr.exercise} className="text-sm text-amber-200 flex justify-between">
                 <span>{pr.exercise}</span>
                 <span className="font-mono font-bold">{pr.weight} kg</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {repPRs.length > 0 && (
+        <div className="w-full max-w-sm mb-6 bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-left fade-in">
+          <div className="flex items-center gap-2 text-blue-400 font-bold mb-2">
+            <Dumbbell size={18} /> Record{repPRs.length > 1 ? 's' : ''} de répétitions !
+          </div>
+          <ul className="space-y-1">
+            {repPRs.map((pr) => (
+              <li key={pr.exercise} className="text-sm text-slate-300">
+                <span className="font-semibold text-white">{pr.exercise}</span> — {pr.reps} reps à {pr.weight} kg (avant : {pr.prevReps})
               </li>
             ))}
           </ul>
