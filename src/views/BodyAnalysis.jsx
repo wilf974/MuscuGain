@@ -15,10 +15,15 @@ import {
   BarChart2,
   Lightbulb,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import LineChart from '../components/ui/LineChart';
+import MeasurementForm from '../components/MeasurementForm';
 import { analyzeBody, AnalyzeBodyError } from '../utils/analyzeBody';
+import { toPoints } from '../utils/measurements.core';
+import { weeklyVolumePoints } from '../utils/timeline.core';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -294,9 +299,68 @@ function ConsentCard({ onAccept, onCancel }) {
   );
 }
 
+// ─── Mes mesures (P4) ─────────────────────────────────────────────────────────
+const MEASURE_OPTIONS = [
+  { key: 'arms', label: 'Bras' },
+  { key: 'waist', label: 'Taille' },
+  { key: 'thighs', label: 'Cuisses' },
+];
+
+function MeasurementsSection({ measurements, addMeasurement, requestDeleteMeasurement }) {
+  const [measureKey, setMeasureKey] = useState('arms');
+  const weightPts = toPoints(measurements, 'weight');
+  const measurePts = toPoints(measurements, measureKey);
+  const recent = measurements.slice(-5).reverse(); // 5 dernières, récent d'abord
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-bold text-white">Mes mesures</h2>
+      <MeasurementForm addMeasurement={addMeasurement} />
+      {weightPts.length >= 2 && <LineChart title="Poids" unit="kg" series={[{ label: 'Poids', points: weightPts }]} />}
+      {measurements.some((m) => m.arms || m.waist || m.thighs) && (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            {MEASURE_OPTIONS.map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => setMeasureKey(o.key)}
+                className={`px-3 py-1 rounded-lg text-xs transition-colors ${measureKey === o.key ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <LineChart
+            title={MEASURE_OPTIONS.find((o) => o.key === measureKey).label}
+            unit="cm"
+            series={[{ label: MEASURE_OPTIONS.find((o) => o.key === measureKey).label, points: measurePts, color: '#f59e0b' }]}
+          />
+        </div>
+      )}
+      {recent.length > 0 && (
+        <div className="bg-slate-800 rounded-xl p-4 space-y-2">
+          <h3 className="text-sm font-semibold text-white">Dernières mesures</h3>
+          {recent.map((m) => (
+            <div key={m.date} className="flex items-center justify-between text-xs text-slate-300">
+              <span>{new Date(m.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <span className="font-mono">
+                {m.weight} kg{m.arms ? ` · bras ${m.arms}` : ''}{m.waist ? ` · taille ${m.waist}` : ''}{m.thighs ? ` · cuisses ${m.thighs}` : ''}
+              </span>
+              <button type="button" onClick={() => requestDeleteMeasurement(m.date)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors" aria-label="Supprimer la mesure">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main view ────────────────────────────────────────────────────────────────
 
-export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis }) {
+export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measurements, addMeasurement, requestDeleteMeasurement, history }) {
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
@@ -467,6 +531,13 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis }) {
             </div>
             <CaptureButtons triggerCapture={triggerCapture} />
           </Card>
+
+          {/* Mes mesures */}
+          <MeasurementsSection
+            measurements={measurements}
+            addMeasurement={addMeasurement}
+            requestDeleteMeasurement={requestDeleteMeasurement}
+          />
 
           {/* Timeline */}
           <Timeline bodyAnalyses={bodyAnalyses} />
