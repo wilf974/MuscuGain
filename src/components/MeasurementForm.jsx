@@ -55,7 +55,7 @@ export default function MeasurementForm({ addMeasurement }) {
       >
         Enregistrer
       </button>
-      <p className="text-[10px] text-slate-500">Une mesure par jour — re-saisir aujourd'hui remplace la mesure du jour.</p>
+      <p className="text-[10px] text-slate-500">Une mesure par jour — ressaisir aujourd'hui remplace la mesure du jour.</p>
     </form>
   );
 }

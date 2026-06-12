@@ -308,6 +308,7 @@ const MEASURE_OPTIONS = [
 
 function MeasurementsSection({ measurements, addMeasurement, requestDeleteMeasurement }) {
   const [measureKey, setMeasureKey] = useState('arms');
+  const measureLabel = MEASURE_OPTIONS.find((o) => o.key === measureKey).label;
   const weightPts = toPoints(measurements, 'weight');
   const measurePts = toPoints(measurements, measureKey);
   const recent = measurements.slice(-5).reverse(); // 5 dernières, récent d'abord
@@ -332,9 +333,9 @@ function MeasurementsSection({ measurements, addMeasurement, requestDeleteMeasur
             ))}
           </div>
           <LineChart
-            title={MEASURE_OPTIONS.find((o) => o.key === measureKey).label}
+            title={measureLabel}
             unit="cm"
-            series={[{ label: MEASURE_OPTIONS.find((o) => o.key === measureKey).label, points: measurePts, color: '#f59e0b' }]}
+            series={[{ label: measureLabel, points: measurePts, color: '#f59e0b' }]}
           />
         </div>
       )}
