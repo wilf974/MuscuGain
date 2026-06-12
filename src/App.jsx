@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import useAlarm from './hooks/useAlarm';
 import { calculateVolume } from './utils/format';
+import { upsertMeasurement } from './utils/measurements.core';
 import InstallPrompt from './components/InstallPrompt';
 import NavBar from './components/NavBar';
 import ConfirmationModal from './components/modals/ConfirmationModal';
@@ -26,6 +27,7 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [customRoutines, setCustomRoutines] = useState([]);
   const [bodyAnalyses, setBodyAnalyses] = useState([]);
+  const [measurements, setMeasurements] = useState([]);
   const [coachAnalysis, setCoachAnalysis] = useState(null);
   const [lastFinishedSession, setLastFinishedSession] = useState(null);
   const [editingRoutine, setEditingRoutine] = useState(null);
@@ -70,6 +72,14 @@ export default function App() {
     if (savedRoutines) setCustomRoutines(JSON.parse(savedRoutines));
     const savedBody = localStorage.getItem('muscuGainBodyAnalyses');
     if (savedBody) setBodyAnalyses(JSON.parse(savedBody));
+    const savedMeasurements = localStorage.getItem('muscuGainMeasurements');
+    if (savedMeasurements) {
+      try {
+        setMeasurements(JSON.parse(savedMeasurements));
+      } catch {
+        localStorage.removeItem('muscuGainMeasurements');
+      }
+    }
     const savedCoach = localStorage.getItem('muscuGainCoachAnalysis');
     if (savedCoach) {
       try {
@@ -338,6 +348,11 @@ export default function App() {
       setHistory(newHistory);
       localStorage.setItem('muscuGainHistory', JSON.stringify(newHistory));
       showToast('Séance supprimée');
+    } else if (confirmModal.type === 'measurement') {
+      const updated = measurements.filter((m) => m.date !== confirmModal.id);
+      setMeasurements(updated);
+      localStorage.setItem('muscuGainMeasurements', JSON.stringify(updated));
+      showToast('Mesure supprimée');
     }
     setConfirmModal({ ...confirmModal, isOpen: false });
   };
@@ -404,6 +419,24 @@ export default function App() {
     const updated = [entry, ...bodyAnalyses];
     setBodyAnalyses(updated);
     localStorage.setItem('muscuGainBodyAnalyses', JSON.stringify(updated));
+  };
+
+  // --- Mesures corporelles ---
+  const addMeasurement = (entry) => {
+    const updated = upsertMeasurement(measurements, entry);
+    setMeasurements(updated);
+    localStorage.setItem('muscuGainMeasurements', JSON.stringify(updated));
+    showToast('Mesure enregistrée');
+  };
+
+  const requestDeleteMeasurement = (date) => {
+    setConfirmModal({
+      isOpen: true,
+      type: 'measurement',
+      id: date,
+      title: 'Supprimer cette mesure ?',
+      message: 'Elle disparaîtra définitivement de vos courbes.',
+    });
   };
 
   // --- Bilan Coach IA (cache 1/jour) ---
@@ -555,7 +588,14 @@ export default function App() {
         />
       )}
       {view === 'body' && (
-        <BodyAnalysis bodyAnalyses={bodyAnalyses} addBodyAnalysis={addBodyAnalysis} />
+        <BodyAnalysis
+          bodyAnalyses={bodyAnalyses}
+          addBodyAnalysis={addBodyAnalysis}
+          measurements={measurements}
+          addMeasurement={addMeasurement}
+          requestDeleteMeasurement={requestDeleteMeasurement}
+          history={history}
+        />
       )}
 
       {!isSessionView && <NavBar view={view} setView={setView} activeRoutine={activeRoutine} />}
