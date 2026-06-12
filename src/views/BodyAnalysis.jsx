@@ -539,6 +539,25 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measuremen
             requestDeleteMeasurement={requestDeleteMeasurement}
           />
 
+          {/* Évolution globale */}
+          {(() => {
+            const weightPts = toPoints(measurements, 'weight');
+            const volPts = weeklyVolumePoints(history);
+            const analysisDates = (bodyAnalyses || []).map((a) => a.date).filter(Boolean);
+            if (weightPts.length < 2 && volPts.length < 2) return null;
+            return (
+              <LineChart
+                title="Évolution globale"
+                normalizeEach
+                markers={analysisDates}
+                series={[
+                  { label: 'Poids', points: weightPts },
+                  { label: 'Volume hebdo', points: volPts, color: '#22c55e' },
+                ]}
+              />
+            );
+          })()}
+
           {/* Timeline */}
           <Timeline bodyAnalyses={bodyAnalyses} />
         </>
