@@ -11,16 +11,20 @@ Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (D
 - Deploy : `docker compose up -d --build` (Dockerfile multi-stage : `npm ci` + `vite build` → nginx).
 
 ## Structure `src/`
-- `App.jsx` — état global (vues, `customRoutines`, historique, `bodyAnalyses`, timers), persistance localStorage, modales.
+- `App.jsx` — état global (vues, `customRoutines`, historique, `bodyAnalyses`, `measurements`, timers), persistance localStorage, modales.
 - `views/` — Dashboard, SessionSetup, Warmup, Workout, Cooldown, History, CreateRoutine, **BodyAnalysis**.
-- `components/ui/` (Button, Card, **VolumeChart**), `components/modals/` (Confirmation, AddExercise, Video, ImportRoutine), NavBar (4 onglets : Accueil, Analyse, [FAB séance], Historique), InstallPrompt.
+- `components/` — ui/ (Button, Card, **VolumeChart**, **LineChart** : courbe SVG générique multi-séries/markers/`normalizeEach`), modals/ (Confirmation, AddExercise, Video, ImportRoutine), **MeasurementForm**, NavBar (4 onglets : Accueil, Analyse, [FAB séance], Historique), InstallPrompt.
 - `data/` — exercises.js (`EXERCISES_DB` par groupe + `MUSCLE_LABELS`), routines.js (`DEFAULT_ROUTINES`), videos.js.
-- `hooks/` (useAlarm), `utils/` (format.js, parseWorkbook.{core.,}js, recognizeMachine.{core.,}js, **records.core.js**, **analyzeBody.{core.,}js**).
+- `hooks/` (useAlarm), `utils/` (format.js, parseWorkbook.{core.,}js, recognizeMachine.{core.,}js, **records.core.js**, **analyzeBody.{core.,}js**, **measurements.core.js**, **chart.core.js**, **timeline.core.js**).
 
 ## Historique & records
-- History : accordéon par séance (poids/reps par série), graphique SVG volume (`VolumeChart`, 30 dernières), badge 🏆 sur séries record.
-- Records PR (`utils/records.core.js`) : `computePRs`/`detectNewPRs`, PR = poids max sur série `done` par exercice. Bannière 🏆 dans Cooldown.
+- History : accordéon par séance (poids/reps par série, 1RM estimé par exo), graphique SVG volume (`VolumeChart`, 30 dernières), badge 🏆 sur séries record, **graphique progression par exercice** (sélecteur → poids max + 1RM estimé).
+- Records (`utils/records.core.js`) : `computePRs`/`detectNewPRs` (PR poids = poids max série `done`, bannière 🏆 Cooldown) + `epley1RM`/`compute1RMs`/`detectRepPRs` (PR force = plus de reps au poids max, bannière bleue 💪 Cooldown).
 - Pas d'export/import JSON (retiré : illisible néophyte, données non exposées).
+
+## Mesures corporelles (section « Mes mesures », onglet Analyse)
+- `utils/measurements.core.js` : `parseMeasurementInput` (poids requis 20–400 kg, bras/taille/cuisses optionnels 10–300 cm, virgule décimale), `upsertMeasurement` (1/jour, écrase), `toPoints`. Clé `localStorage.muscuGainMeasurements`.
+- UI : `MeasurementForm` + courbe poids + sélecteur mensuration + 5 dernières (suppression confirmée). Timeline enrichie « Évolution globale » : poids + volume hebdo (`utils/timeline.core.js`, semaine ISO UTC) superposés normalisés, markers = analyses IA.
 
 ## Analyse corporelle (onglet « Analyse », `view 'body'`)
 - Backend `POST /analyze-body` (`backend/server.js`) : photo → NVIDIA NIM → `{morphotype, balance, bodyFatRange, strengths[], weaknesses[], trainingAdvice[], evolutionNote}`. Coach fitness, **non médical**. Photo non journalisée.
@@ -58,7 +62,7 @@ Vision : coach de muscu pour néophyte — l'IA digère les données, l'utilisat
 - **P1 Confort séance** ✅ livré : suppr. série en séance, éditer (crayon, garde id)/réordonner (↑↓)/dupliquer programme, champ « Pause (s) » par exo dans CreateRoutine, toasts (`ui/Toast.jsx` : `ToastProvider`+`useToast`), notes séance (`entry.notes` Cooldown→History).
 - **P2 Coach IA** ⭐ ✅ livré : `POST /coach-analysis` (résumé historique → bilan : progression/plateaux/volume/équilibre/deload + `bodyCross` corps×training) carte Dashboard cache 1/jour ; `POST /generate-program` (objectif → routine, noms validés) via `GenerateProgramModal` ; suggestion de charge Workout (`suggestLoad`). Utils : `coach.{core.,}js`, `categoryOf` (`data/exercises.js`). Clé cache : `muscuGainCoachAnalysis`.
 - **P3 PWA/résilience** ✅ livré (sauf IndexedDB, reporté) : PWA via vite-plugin-pwa (SW Workbox autoUpdate, offline, `/api/*` NetworkOnly + denylist), installable (icônes locales `public/pwa-*.png`+`icon.svg`, manifest généré), `utils/persistence.js` (`storage.persist()` au boot), `utils/reminder.js` (rappels Notification opt-in, seuil 3j, testé). nginx : `sw.js`/`manifest` no-cache. Clés : `muscuGainReminders`, `muscuGainLastReminder`.
-- **P4 Suivi corporel+** : poids/mensurations + courbes, 1RM Epley, graphique par exercice.
+- **P4 Suivi corporel+** ✅ livré : mesures + courbes (`measurements.core`, `LineChart`, `MeasurementForm`), timeline enrichie (poids×volume hebdo, markers IA), 1RM Epley + PR force (`records.core`), graphique progression par exercice (History).
 - **P5 Backend/qualité** : tests backend (fetch injecté), fallback modèle, CI GitHub Actions, headers sécu nginx, extraire hook `useWorkoutSession` d'App.jsx.
 - **P6 Polish** : mode clair, onboarding, a11y, sons.
 `TODO.md` = obsolète (pointeur vers ROADMAP).

@@ -39,13 +39,13 @@ Mise à jour : 2026-06-11. Vision : **le coach de musculation dans la poche d'un
 - [x] **Rappel de séance** : `utils/reminder.js` (pur testé : `daysSince`/`shouldRemind`, seuil 3j, 1/jour max) + Notification API opt-in (toggle Dashboard).
 - nginx : `sw.js`/`manifest` en `no-cache` (anti-SW figé).
 
-## Phase 4 — Suivi corporel élargi 📊
+## Phase 4 — Suivi corporel élargi 📊 ✅ LIVRÉ 2026-06-12
 *Effort : moyen. Valeur : fidélisation, complète l'onglet Analyse.*
 
-- [ ] **Poids corporel + mensurations** : saisie rapide (poids, tour de bras/taille/cuisses), courbe SVG maison (réutiliser le pattern VolumeChart).
-- [ ] **Timeline corporelle enrichie** : superposer analyses IA + poids + volume d'entraînement sur une même frise → l'évolution devient visible.
-- [ ] **1RM estimé** (Epley : poids × (1 + reps/30)) par exercice, affiché dans l'histo détaillé + détection de PR « force » (plus de reps à poids égal).
-- [ ] **Graphique par exercice** : progression du poids max sur un exercice donné (sélecteur + SVG).
+- [x] **Poids corporel + mensurations** : saisie rapide (poids, tour de bras/taille/cuisses), courbe SVG maison (réutiliser le pattern VolumeChart).
+- [x] **Timeline corporelle enrichie** : superposer analyses IA + poids + volume d'entraînement sur une même frise → l'évolution devient visible.
+- [x] **1RM estimé** (Epley : poids × (1 + reps/30)) par exercice, affiché dans l'histo détaillé + détection de PR « force » (plus de reps à poids égal).
+- [x] **Graphique par exercice** : progression du poids max sur un exercice donné (sélecteur + SVG).
 
 ## Phase 5 — Backend & qualité 🔧
 *Effort : continu. Valeur : robustesse, maintenabilité.*

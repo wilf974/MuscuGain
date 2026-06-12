@@ -3,6 +3,24 @@
 Ce fichier contient un résumé concis des dernières conversations.
 
 ---
+### 12/06/2026 — P4 Suivi corporel élargi livré (mesures, courbes, 1RM Epley, PR force)
+**Demande:** Continuer la roadmap → P4 complet (4 items), saisie dans l'onglet Analyse, 1 mesure/jour max, 4 champs fixes.
+**Résultat:** P4 livré (workflow superpowers : brainstorm → spec → plan 11 tasks → subagent-driven TDD, 5 lots, 2 reviews/lot toutes approuvées).
+- **Mesures corporelles** : `utils/measurements.core.js` (parse virgule décimale, bornes 20–400 kg / 10–300 cm, upsert 1/jour écrase, `toPoints`) + `components/MeasurementForm.jsx` + section « Mes mesures » dans BodyAnalysis (formulaire, courbe poids, sélecteur bras/taille/cuisses, liste 5 dernières + suppression confirmée). Clé `localStorage.muscuGainMeasurements`, état dans App.jsx (pattern bodyAnalyses).
+- **LineChart générique** : `components/ui/LineChart.jsx` (SVG 320×120, multi-séries, `normalizeEach` pour unités différentes, markers verticaux pointillés, axe X = temps réel) + math pur testé `utils/chart.core.js` (`chartCoords`/`seriesDomain`). VolumeChart inchangé.
+- **Timeline enrichie** : courbe « Évolution globale » (poids + volume hebdo `utils/timeline.core.js` superposés normalisés, markers = dates analyses IA) au-dessus de la frise existante.
+- **1RM Epley + PR force** : `records.core.js` étendu — `epley1RM` (×(1+reps/30), arrondi 0.5 kg), `compute1RMs` (affiché dans l'accordéon History), `detectRepPRs` (plus de reps au poids max → bannière bleue 💪 Cooldown, distincte du PR poids 🏆).
+- **Graphique par exercice** : sélecteur dans History → courbe poids max + 1RM estimé par séance.
+- **Reviews** : 4 lots code reviewés (spec + qualité) → retouches commitées (tests toPoints/seriesDomain, commentaire bucketing UTC, hoist measureLabel, useMemo PR Cooldown anti re-render timers).
+
+| Vérification | Résultat |
+|---|---|
+| `node --test src/utils/` | 44/44 PASS |
+| `npm run build` | OK à chaque lot |
+| Spec reviews (4 lots) | ✅ conformes |
+| Quality reviews (4 lots) | ✅ approuvées, 0 bloquant |
+
+---
 ### 11/06/2026 — Reco machine : OCR amélioré + exercices hors-liste (catalogue perso)
 **Demande:** La reco machine se trompait (photo du nom « dips » d'une machine triceps → sortait « développé couché »). + idée user : que l'IA ajoute l'exo s'il n'existe pas dans la liste.
 **Résultat:** Reco refondue + catalogue perso persistant (plan → subagent-driven TDD + review approuvée).
