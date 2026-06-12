@@ -2,12 +2,42 @@ import { useState } from 'react';
 import { CalendarX, Trash2, ChevronDown, ChevronUp, Check, Trophy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { formatDuration } from '../utils/format';
-import { computePRs } from '../utils/records.core';
+import { computePRs, compute1RMs, epley1RM } from '../utils/records.core';
 import VolumeChart from '../components/ui/VolumeChart';
+import LineChart from '../components/ui/LineChart';
 
 export default function History({ history, requestDeleteHistory }) {
   const [expanded, setExpanded] = useState(null);
+  const [chartExercise, setChartExercise] = useState('');
   const prs = computePRs(history);
+  const oneRMs = compute1RMs(history);
+
+  // Poids max (série done) par séance pour l'exo choisi + 1RM estimé correspondant.
+  const exerciseNames = [...new Set(history.flatMap((s) => Object.keys(s.exercises || {})))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const progressSeries = (() => {
+    if (!chartExercise) return null;
+    const maxPts = [];
+    const rmPts = [];
+    for (const s of history) {
+      const sets = (s.exercises || {})[chartExercise];
+      if (!sets) continue;
+      let bestW = null;
+      let bestRM = null;
+      for (const set of sets) {
+        if (!set.done) continue;
+        const w = Number(set.weight);
+        if (Number.isFinite(w) && w > 0 && (bestW === null || w > bestW)) bestW = w;
+        const rm = epley1RM(set.weight, set.reps);
+        if (rm !== null && (bestRM === null || rm > bestRM)) bestRM = rm;
+      }
+      if (bestW !== null) maxPts.push({ x: s.date, y: bestW });
+      if (bestRM !== null) rmPts.push({ x: s.date, y: bestRM });
+    }
+    return [
+      { label: 'Poids max', points: maxPts },
+      { label: '1RM estimé', points: rmPts, color: '#f59e0b' },
+    ];
+  })();
 
   return (
     <div className="space-y-6 pb-24 fade-in">
@@ -15,6 +45,22 @@ export default function History({ history, requestDeleteHistory }) {
         <h1 className="text-2xl font-bold text-white">Historique</h1>
       </header>
       {history.length > 0 && <VolumeChart history={history} />}
+      {history.length > 0 && exerciseNames.length > 0 && (
+        <div className="space-y-2">
+          <select
+            value={chartExercise}
+            onChange={(e) => setChartExercise(e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+            aria-label="Choisir un exercice"
+          >
+            <option value="">Progression par exercice…</option>
+            {exerciseNames.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          {progressSeries && <LineChart title={chartExercise} unit="kg" series={progressSeries} />}
+        </div>
+      )}
       {history.length === 0 ? (
         <div className="text-center py-12 text-slate-500">
           <CalendarX size={48} className="mx-auto mb-4 opacity-50" />
@@ -60,6 +106,9 @@ export default function History({ history, requestDeleteHistory }) {
                     {Object.entries(session.exercises).map(([exName, sets]) => (
                       <div key={exName} className="bg-slate-900/60 rounded-lg p-3">
                         <div className="text-sm font-semibold text-white mb-2">{exName}</div>
+                        {oneRMs[exName] && (
+                          <div className="text-[10px] text-slate-500 font-mono mb-1">1RM est. : {oneRMs[exName]} kg</div>
+                        )}
                         <div className="space-y-1">
                           {sets.map((set, i) => {
                             const empty = !set.weight;
