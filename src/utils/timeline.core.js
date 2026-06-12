@@ -1,6 +1,8 @@
 // src/utils/timeline.core.js
 // Agrégats temporels pour la timeline corporelle enrichie.
 
+// Bucketing en UTC : une séance proche de minuit (heure locale non-UTC) peut
+// basculer dans la semaine adjacente. Cohérent partout, acceptable pour une courbe.
 function mondayOf(dateISO) {
   const d = new Date(dateISO);
   if (Number.isNaN(d.getTime())) return null;

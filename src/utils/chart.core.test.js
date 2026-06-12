@@ -54,3 +54,8 @@ test('seriesDomain returns global min/max across series', () => {
   ]);
   assert.deepEqual(d, { min: 10, max: 95 });
 });
+
+test('seriesDomain returns nulls for empty or invalid series', () => {
+  assert.deepEqual(seriesDomain([]), { min: null, max: null });
+  assert.deepEqual(seriesDomain([{ points: [{ x: 'bad', y: 1 }] }]), { min: null, max: null });
+});

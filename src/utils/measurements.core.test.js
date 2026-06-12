@@ -1,7 +1,7 @@
 // src/utils/measurements.core.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMeasurementInput, upsertMeasurement } from './measurements.core.js';
+import { parseMeasurementInput, upsertMeasurement, toPoints } from './measurements.core.js';
 
 test('parseMeasurementInput accepts weight only', () => {
   const r = parseMeasurementInput({ date: '2026-06-12', weight: '82.5' });
@@ -43,4 +43,17 @@ test('upsertMeasurement overwrites same-day entry', () => {
   const out = upsertMeasurement(list, { date: '2026-06-10', weight: 82, arms: 38 });
   assert.equal(out.length, 1);
   assert.deepEqual(out[0], { date: '2026-06-10', weight: 82, arms: 38 });
+});
+
+test('toPoints projects a field, skipping entries without it', () => {
+  const list = [
+    { date: '2026-06-01', weight: 80 },
+    { date: '2026-06-05', weight: 81, arms: 38 },
+  ];
+  assert.deepEqual(toPoints(list, 'weight'), [
+    { x: '2026-06-01', y: 80 },
+    { x: '2026-06-05', y: 81 },
+  ]);
+  assert.deepEqual(toPoints(list, 'arms'), [{ x: '2026-06-05', y: 38 }]);
+  assert.deepEqual(toPoints([], 'weight'), []);
 });
