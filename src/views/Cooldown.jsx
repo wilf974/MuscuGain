@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Wind, X, Trophy, Dumbbell } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { formatTime, formatDuration, calculateVolume } from '../utils/format';
 import { detectNewPRs, detectRepPRs } from '../utils/records.core';
 
 export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, workoutData, saveAndExit, history }) {
-  const newPRs = detectNewPRs(history || [], { exercises: workoutData });
-  const repPRs = detectRepPRs(history || [], { exercises: workoutData });
+  // Memo : la vue re-render 2×/s (timers App), pas besoin de rescanner l'historique.
+  const newPRs = useMemo(() => detectNewPRs(history || [], { exercises: workoutData }), [history, workoutData]);
+  const repPRs = useMemo(() => detectRepPRs(history || [], { exercises: workoutData }), [history, workoutData]);
   const [notes, setNotes] = useState('');
 
   return (
