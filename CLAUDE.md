@@ -9,13 +9,30 @@ Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (D
 - Container `muscugain-app`, `127.0.0.1:8080->80`, réseau externe `vps-network` (reverse proxy VPS).
 - Projet compose `muscugain`, service `muscugain`, `/opt/apps/MuscuGain/docker-compose.yml`.
 - Deploy : `docker compose up -d --build` (Dockerfile multi-stage : `npm ci` + `vite build` → nginx).
+- nginx : `nginx-container.conf` + `nginx-security-headers.conf` (CSP stricte, inclus dans CHAQUE location — `add_header` n'est pas hérité). Toute nouvelle origine externe (img/iframe/fetch) doit être ajoutée à la CSP.
+- Rate-limit backend par IP via `X-Real-IP` posé par le proxy VPS : ne PAS le réécrire dans `location /api/` du nginx conteneur.
 
 ## Structure `src/`
-- `App.jsx` — état global (vues, `customRoutines`, historique, `bodyAnalyses`, `measurements`, timers), persistance localStorage, modales.
+- `App.jsx` — routeur de vues (`dashboard|history|body|create|session`) + état métier (historique, programmes, mesures, analyses), modales ; vues lourdes en `lazy()`.
+- `hooks/useWorkoutSession.js` — machine de séance (setup→warmup→workout→cooldown) : état unique persisté à chaque changement dans `muscuGainActiveSession` (format compatible ancienne version + `sessionId`, `workoutEndTime`), timers dérivés de timestamps (recalcul `visibilitychange`), ajout d'exo idempotent, reprise.
+- `components/scanner/ScannerSheet.jsx` — scanner de machine ; `components/ui/Sheet.jsx` (modale accessible, à utiliser pour toute nouvelle modale), `IconButton` (44 px + aria-label), `Button` (variants primary/secondary/soft/danger/ghost/success/warning).
 - `views/` — Dashboard, SessionSetup, Warmup, Workout, Cooldown, History, CreateRoutine, **BodyAnalysis**.
-- `components/` — ui/ (Button, Card, **VolumeChart**, **LineChart** : courbe SVG générique multi-séries/markers/`normalizeEach`), modals/ (Confirmation, AddExercise, Video, ImportRoutine), **MeasurementForm**, NavBar (4 onglets : Accueil, Analyse, [FAB séance], Historique), InstallPrompt.
+- `components/` — ui/ (Button, Card, **VolumeChart**, **LineChart** : courbe SVG générique multi-séries/markers/`normalizeEach`), modals/ (Confirmation, AddExercise, Video, ImportRoutine), **MeasurementForm**, NavBar (Accueil · Historique · [bouton central : Scanner, ou Séance si une séance est en cours] · Analyse), InstallPrompt (bandeau compact iOS/Android), InstallHelp, Onboarding, SettingsSheet, OfflineBanner, ExerciseDetails, CatalogPicker.
 - `data/` — exercises.js (`EXERCISES_DB` par groupe + `MUSCLE_LABELS`), routines.js (`DEFAULT_ROUTINES`), videos.js.
-- `hooks/` (useAlarm), `utils/` (format.js, parseWorkbook.{core.,}js, recognizeMachine.{core.,}js, **records.core.js**, **analyzeBody.{core.,}js**, **measurements.core.js**, **chart.core.js**, **timeline.core.js**).
+- `hooks/` (useAlarm, useWorkoutSession, useOnlineStatus, useNow), `utils/` (format.js, parseWorkbook.{core.,}js, recognizeMachine.{core.,}js, records.core.js, analyzeBody.{core.,}js, measurements.core.js, chart.core.js, timeline.core.js, **dates.core.js**, **stats.core.js**, **session.core.js**, **storage.{core.,}js**, **scanner.core.js**, theme.js, platform.js), `data/safety.js` (conseils sécurité par groupe).
+
+## Stockage & migration
+- Toujours passer par `utils/storage.js` (`load`/`save`/`KEYS`) : lecture tolérante (JSON corrompu → fallback), `save` renvoie `false` si quota (App affiche un toast).
+- Schéma versionné `muscuGainSchemaVersion` (actuel **2**). `runMigrations()` dans `main.jsx` avant le 1er rendu ; `migrateStorage` idempotent : ids de séance (`h_<ts>_<i>`), sauvegarde brute `muscuGainHistoryBackupV1`, JSON illisible → `muscuGainHistoryCorrupt`. Tout changement de schéma = nouvelle étape de migration + test.
+- Historique : entrées `{ id, date (ISO instant), routineName, exercises, totalVolume, durationSeconds, notes }`, triées récent→ancien, upsert par `id` (reprise d'une séance terminée < 2 h = même `sessionId` → remplacée, pas dupliquée).
+- **Dates** : instants en ISO, mais tout « jour »/« semaine » via `dates.core` (`localDateKey`, `localWeekKey`, `toTime` pour 'YYYY-MM-DD' local). Jamais `toISOString().slice(0,10)`.
+- Autres clés : `muscuGainTheme` (dark|light|system, défaut dark), `muscuGainOnboarded`, `muscuGainInstallDismissed`.
+
+## iPhone / PWA
+- Safe-area : conteneur `pt-[max(1rem,env(safe-area-inset-top))]`, en-têtes collants `top-safe`, utilitaires `pb-safe`/`pb-nav`/`bottom-nav` (index.css). Status bar `black-translucent` + bande sombre fixe derrière.
+- Thème : palettes Tailwind = variables CSS (`tailwind.config.js`), `html.theme-light` les inverse ; texte sur fond d'accent plein = `text-onaccent` (jamais `text-white`, qui devient l'encre foncée en clair). `public/theme-init.js` évite le flash.
+- iOS : `input.click()` d'un `<input type=file>` uniquement dans le geste utilisateur (pas de `setTimeout`) ; inputs ≥ 16 px ; poids en `inputMode="decimal"` (virgule → point).
+- SW : `/api/*` NetworkOnly, aucune règle de cache runtime (ni réponses IA, ni photos, ni YouTube).
 
 ## Historique & records
 - History : accordéon par séance (poids/reps par série, 1RM estimé par exo), graphique SVG volume (`VolumeChart`, 30 dernières), badge 🏆 sur séries record, **graphique progression par exercice** (sélecteur → poids max + 1RM estimé).
@@ -52,10 +69,10 @@ Vite 7 + React 19 + Tailwind 3 + lucide-react. Build statique servi par nginx (D
 - Env : `backend/.env` (`NVIDIA_API_KEY`, `NVIDIA_MODEL`, `PORT=8000`). `.env` non committé (clé).
 - ⚠️ Confidences candidats 2/3 mal calibrées → se fier à l'ordre, pas à la valeur absolue.
 - **Intégré et déployé** : service `muscugain-backend` (compose, `expose:8000`, interne `vps-network`) + nginx `location /api/` (proxy strip, `client_max_body_size 10m`). Front appelle `/api/recognize-exercise` en relatif.
-- Front : `src/utils/recognizeMachine.{core.,}js` (core pur testé + IO canvas/fetch), bouton « 📷 Identifier par photo » dans `AddExerciseModal` (idle/loading/results/error, liste manuelle en fallback).
+- Front : `src/utils/recognizeMachine.{core.,}js` (core pur testé + IO canvas/fetch, AbortSignal + délai 60 s, erreurs offline/timeout/cancelled/invalid via `recognizeErrorKind`) + `utils/scanner.core.js` (`classifyRecognition` : high = n°1 connu du catalogue ET confiance ≥ 0.75, sinon choix à confirmer ; `exerciseInfo` ; `videoIdFor` n'accepte que les IDs YouTube valides du mapping). UI : `ScannerSheet` (entrées : onglet central NavBar, carte Dashboard, en-tête Workout, `AddExerciseModal`, raccourci `/?action=scan`).
 
 ## Mode séance libre
-- Bouton « Séance libre » sur le Dashboard (`App.startFreeSession`) → routine vide `{name:'Séance libre', exercises:[]}` → flux setup→warmup→workout. Ajout d'exos à la volée (manuel ou photo) pendant la séance. Historisé comme une séance normale (`routineName:'Séance libre'`).
+- Bouton « Séance libre » sur le Dashboard (`App.startFreeSession` → `ws.startFree`) ; le scanner hors séance démarre aussi une séance libre avec l'exo confirmé → routine vide `{name:'Séance libre', exercises:[]}` → flux setup→warmup→workout. Ajout d'exos à la volée (manuel ou photo) pendant la séance. Historisé comme une séance normale (`routineName:'Séance libre'`).
 
 ## Roadmap (détail : `ROADMAP.md`)
 Vision : coach de muscu pour néophyte — l'IA digère les données, l'utilisateur ne manipule jamais de JSON.
@@ -63,11 +80,13 @@ Vision : coach de muscu pour néophyte — l'IA digère les données, l'utilisat
 - **P2 Coach IA** ⭐ ✅ livré : `POST /coach-analysis` (résumé historique → bilan : progression/plateaux/volume/équilibre/deload + `bodyCross` corps×training) carte Dashboard cache 1/jour ; `POST /generate-program` (objectif → routine, noms validés) via `GenerateProgramModal` ; suggestion de charge Workout (`suggestLoad`). Utils : `coach.{core.,}js`, `categoryOf` (`data/exercises.js`). Clé cache : `muscuGainCoachAnalysis`.
 - **P3 PWA/résilience** ✅ livré (sauf IndexedDB, reporté) : PWA via vite-plugin-pwa (SW Workbox autoUpdate, offline, `/api/*` NetworkOnly + denylist), installable (icônes locales `public/pwa-*.png`+`icon.svg`, manifest généré), `utils/persistence.js` (`storage.persist()` au boot), `utils/reminder.js` (rappels Notification opt-in, seuil 3j, testé). nginx : `sw.js`/`manifest` no-cache. Clés : `muscuGainReminders`, `muscuGainLastReminder`.
 - **P4 Suivi corporel+** ✅ livré : mesures + courbes (`measurements.core`, `LineChart`, `MeasurementForm`), timeline enrichie (poids×volume hebdo, markers IA), 1RM Epley + PR force (`records.core`), graphique progression par exercice (History).
-- **P5 Backend/qualité** : tests backend (fetch injecté), fallback modèle, CI GitHub Actions, headers sécu nginx, extraire hook `useWorkoutSession` d'App.jsx.
-- **P6 Polish** : mode clair, onboarding, a11y, sons.
+- **iPhone/PWA v2** ✅ livré 2026-10-05 (branche `feature/iphone-pwa-v2`) : shell iPhone (safe-area, thème clair, a11y, Sheet), scanner 2 taps, useWorkoutSession, migration v2, dates locales, dashboard prochaine action, onboarding, CSP. Points « à valider sur iPhone » : HISTORIQUE 05/10/2026.
+- **P5 Backend/qualité** : ✅ tests backend `lib.js`, rate-limit par IP, headers nginx, `useWorkoutSession`. Reste : fetch injecté, fallback modèle, CI, Tailwind 4 (audit).
+- **P6 Polish** : ✅ mode clair, onboarding, a11y de base. Reste : sons, transitions, notif repos écran verrouillé.
 `TODO.md` = obsolète (pointeur vers ROADMAP).
 
 ## Conventions
 - Charte : dark slate-900/800, accent blue-500/600, rounded-xl/2xl, `fade-in`, sémantique amber/green/red. Réutiliser Button/Card.
-- Pas de lint installé localement → le gate de compilation est `npm run build`.
+- Gate qualité : `npm run check` (= `eslint src` + `node --test "src/**/*.test.js"` + `vite build`) ; backend : `cd backend && npm test`.
+- Windows : si npm échoue avec « 'node' n'est pas reconnu », le PATH dépasse la limite de cmd.exe → dédoublonner `$env:Path` dans la session.
 - Historique détaillé : `HISTORIQUE.MD`.

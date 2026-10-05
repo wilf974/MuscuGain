@@ -1,6 +1,6 @@
 # MuscuGain — Roadmap
 
-Mise à jour : 2026-06-11. Vision : **le coach de musculation dans la poche d'un néophyte** — l'app observe, l'IA conseille, l'utilisateur ne manipule jamais de données techniques.
+Mise à jour : 2026-10-05. Vision : **le coach de musculation dans la poche d'un néophyte** — l'app observe, l'IA conseille, l'utilisateur ne manipule jamais de données techniques.
 
 ## Principes produit
 1. **Néophyte d'abord** : zéro jargon, zéro manipulation de fichiers, l'IA digère le JSON à sa place.
@@ -47,22 +47,36 @@ Mise à jour : 2026-06-11. Vision : **le coach de musculation dans la poche d'un
 - [x] **1RM estimé** (Epley : poids × (1 + reps/30)) par exercice, affiché dans l'histo détaillé + détection de PR « force » (plus de reps à poids égal).
 - [x] **Graphique par exercice** : progression du poids max sur un exercice donné (sélecteur + SVG).
 
+## Phase iPhone/PWA v2 📱 ✅ LIVRÉ 2026-10-05 (branche `feature/iphone-pwa-v2`, non déployé)
+*Objectif : excellente sur iPhone sans Mac, comme vraie app d'écran d'accueil.*
+
+- [x] **Shell iPhone** : `viewport-fit=cover` + safe-area (encoche, barre d'accueil), méta Apple standalone, police système (plus de Google Fonts), thème clair/sombre/système, cibles ≥ 44 px, focus visibles, aria, modales accessibles (`ui/Sheet`), clavier iOS (16 px, `inputMode`, barre d'onglets masquée clavier ouvert), `prefers-reduced-motion`.
+- [x] **Scanner de machine** ≤ 2 taps (onglet central / carte accueil / en-tête séance) : caméra ou photothèque, confiance haute → fiche directe, faible → 1–3 choix à confirmer, catalogue manuel en secours, sécurité, vidéo du mapping existant uniquement, « Ajouter à ma séance » / séance libre. Photo jamais conservée.
+- [x] **Robustesse** : `useWorkoutSession` (état persistant, timers basés sur l'heure), migration de schéma v2 idempotente (ids de séance, sauvegarde brute), reprise sans doublon, dates locales partout, alerte stockage plein, fallback mémoire.
+- [x] **Produit** : dashboard « prochaine action » + semaine/tendance/série, historique groupé par mois + badges records, onboarding 3 écrans, réglages (thème, rappels, installation, vie privée).
+- [x] **Perf/sécurité** : vues lourdes en lazy-load (précachées), CSP stricte + en-têtes nginx, backend validé/limité par IP/timeout, logs sans données sensibles, `npm audit fix` non forcé.
+- [ ] **À valider sur iPhone réel** : voir HISTORIQUE 05/10/2026 (safe-area/status bar, capture caméra, clavier, son du minuteur, install, offline).
+
 ## Phase 5 — Backend & qualité 🔧
 *Effort : continu. Valeur : robustesse, maintenabilité.*
 
-- [ ] **Tests backend** : extraire la logique pure de `server.js` (prompts, normalisation, extractJson) en modules testés `node --test` ; injecter `fetch` pour mocker NIM.
+- [x] **Tests backend** : logique pure extraite dans `backend/lib.js` (35 tests `node --test`). Reste : injecter `fetch` pour tester les routes avec NIM mocké.
 - [ ] **Fallback modèle** : si NIM 5xx/timeout répétés → second modèle (`NVIDIA_MODEL_FALLBACK`) avant d'échouer.
 - [ ] **CI GitHub Actions** : build + tests front/backend sur chaque push (le repo existe : wilf974/MuscuGain).
-- [ ] **Rate-limit par IP** (actuel : global 30/min) + petite télémétrie d'usage des endpoints (compteurs, pas de données perso).
-- [ ] **Headers sécurité nginx** : CSP, X-Content-Type-Options, Referrer-Policy sur le vhost.
-- [ ] **Découper `App.jsx`** (~470 lignes) : extraire la machine séance (timers/autosave/resume) en hook `useWorkoutSession` — App devient routeur + état métier.
+- [x] **Rate-limit par IP** (X-Real-IP du proxy VPS ; 60/min global, 12/min image, 20/min texte). Reste : petite télémétrie d'usage (compteurs, pas de données perso).
+- [x] **Headers sécurité nginx** : `nginx-security-headers.conf` (CSP stricte, nosniff, Referrer-Policy, Permissions-Policy, COOP).
+- [x] **Découper `App.jsx`** : machine séance extraite dans `hooks/useWorkoutSession.js`.
+- [ ] **CI** : `npm run check` + `cd backend && npm test` sur chaque push.
+- [ ] **Tailwind 4** : seule façon de purger les 5 alertes `npm audit` restantes (braces/micromatch/chokidar, outillage de build) — migration majeure.
 
 ## Phase 6 — Polish (nice to have) ✨
-- [ ] Mode clair (toggle, classes Tailwind `dark:` inversées).
+- [x] Mode clair (palette CSS « miroir », toggle Sombre/Clair/Système dans Réglages).
 - [ ] Sons d'alarme personnalisables + vibration réglable.
-- [ ] Onboarding 1er lancement (3 écrans : programmes, séance, analyse).
-- [ ] Accessibilité : focus visibles, aria-labels sur les boutons icône, tailles tap ≥ 44px.
+- [x] Onboarding 1er lancement (3 écrans : carnet, scanner, coach + installation).
+- [x] Accessibilité : focus visibles, aria-labels sur les boutons icône, tailles tap ≥ 44px (audit VoiceOver réel à faire).
 - [ ] Transitions de vue (slide léger) + skeletons de chargement.
+- [ ] Notification de fin de repos écran verrouillé (nécessite Web Push + backend ; iOS ≥ 16.4 installé).
+- [ ] Vidéo pour « Face Pull » : l'ID du mapping est invalide (12 car.) → ignoré ; à remplacer par un ID vérifié.
 
 ---
 
