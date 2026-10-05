@@ -1,394 +1,247 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
 import useAlarm from './hooks/useAlarm';
-import { calculateVolume } from './utils/format';
+import useWorkoutSession from './hooks/useWorkoutSession';
+import useNow from './hooks/useNow';
 import { upsertMeasurement } from './utils/measurements.core';
+import { buildHistoryEntry, upsertHistoryEntry, canResume, exerciseName } from './utils/session.core';
+import { localDateKey } from './utils/dates.core';
+import { KEYS, load, save, remove, loadFlag, saveFlag, loadHistory, isArray, isObject } from './utils/storage';
+import { applyTheme, watchSystemTheme } from './utils/theme';
 import InstallPrompt from './components/InstallPrompt';
 import NavBar from './components/NavBar';
+import OfflineBanner from './components/OfflineBanner';
 import ConfirmationModal from './components/modals/ConfirmationModal';
-import ImportRoutineModal from './components/modals/ImportRoutineModal';
-import GenerateProgramModal from './components/modals/GenerateProgramModal';
+import ScannerSheet from './components/scanner/ScannerSheet';
+import SettingsSheet from './components/SettingsSheet';
+import Onboarding from './components/Onboarding';
 import Dashboard from './views/Dashboard';
-import CreateRoutine from './views/CreateRoutine';
 import SessionSetup from './views/SessionSetup';
 import Warmup from './views/Warmup';
 import Workout from './views/Workout';
 import Cooldown from './views/Cooldown';
-import History from './views/History';
-import BodyAnalysis from './views/BodyAnalysis';
 import { useToast } from './components/ui/Toast';
 import { requestPersistentStorage } from './utils/persistence';
 import { daysSince, shouldRemind, fireReminder } from './utils/reminder';
 
+// Vues/modales lourdes chargées à la demande (précachées par le service worker → dispo hors ligne).
+const History = lazy(() => import('./views/History'));
+const BodyAnalysis = lazy(() => import('./views/BodyAnalysis'));
+const CreateRoutine = lazy(() => import('./views/CreateRoutine'));
+const ImportRoutineModal = lazy(() => import('./components/modals/ImportRoutineModal'));
+const GenerateProgramModal = lazy(() => import('./components/modals/GenerateProgramModal'));
+
+// Raccourci d'icône (manifest) : /?action=scan ouvre directement le scanner.
+const launchAction = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('action') : null;
+
+const Loading = () => (
+  <div role="status" className="flex items-center justify-center gap-2 py-16 text-slate-400">
+    <Loader2 size={20} className="animate-spin" aria-hidden="true" /> Chargement…
+  </div>
+);
+
 export default function App() {
   const showToast = useToast();
-  const [view, setView] = useState('dashboard');
-  const [activeRoutine, setActiveRoutine] = useState(null);
-  const [workoutData, setWorkoutData] = useState({});
-  const [history, setHistory] = useState([]);
-  const [customRoutines, setCustomRoutines] = useState([]);
-  const [bodyAnalyses, setBodyAnalyses] = useState([]);
-  const [measurements, setMeasurements] = useState([]);
-  const [coachAnalysis, setCoachAnalysis] = useState(null);
-  const [lastFinishedSession, setLastFinishedSession] = useState(null);
+  const playAlarmSound = useAlarm();
+  const onRestEnd = useCallback(() => {
+    playAlarmSound();
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  }, [playAlarmSound]);
+  const ws = useWorkoutSession({ onRestEnd });
+
+  // view : 'dashboard' | 'history' | 'body' | 'create' | 'session' (étape = ws.phase)
+  const [view, setView] = useState(() => (ws.phase ? 'session' : 'dashboard'));
+  const [history, setHistory] = useState(loadHistory);
+  const [customRoutines, setCustomRoutines] = useState(() => load(KEYS.routines, [], isArray));
+  const [bodyAnalyses, setBodyAnalyses] = useState(() => load(KEYS.bodyAnalyses, [], isArray));
+  const [measurements, setMeasurements] = useState(() => load(KEYS.measurements, [], isArray));
+  const [coachAnalysis, setCoachAnalysis] = useState(() =>
+    load(KEYS.coach, null, (v) => isObject(v) && v.date && v.data));
+  const [lastFinishedSession, setLastFinishedSession] = useState(() => load(KEYS.lastFinished, null, isObject));
   const [editingRoutine, setEditingRoutine] = useState(null);
 
-  // Confirmation Modal
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, id: null, title: '', message: '' });
-  // Cancel session modal
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  // Import routines modal
   const [importModalOpen, setImportModalOpen] = useState(false);
-  // Generate program (IA) modal
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(() => launchAction === 'scan');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Onboarding : 1er lancement uniquement (les utilisateurs existants ont déjà un historique).
+  const [onboardingOpen, setOnboardingOpen] = useState(
+    () => !loadFlag(KEYS.onboarded) && loadHistory().length === 0 && launchAction !== 'scan');
 
-  // Timer States
-  const [sessionStartTime, setSessionStartTime] = useState(null);
-  const [phaseStartTime, setPhaseStartTime] = useState(null);
-  const [phaseInitialDuration, setPhaseInitialDuration] = useState(0);
-  const [restStartTime, setRestStartTime] = useState(null);
-  const [restInitialDuration, setRestInitialDuration] = useState(0);
+  // Écriture + alerte si le stockage est plein (mode privé, quota iOS).
+  const persist = useCallback((key, value) => {
+    if (!save(key, value)) showToast('Stockage plein : donnée non sauvegardée', 'error');
+  }, [showToast]);
 
-  // Display values
-  const [sessionDuration, setSessionDuration] = useState(0);
-  const [phaseTimer, setPhaseTimer] = useState(0);
-  const [restTimer, setRestTimer] = useState(0);
-  const [isRestTimerRunning, setIsRestTimerRunning] = useState(false);
-
-  // Config
-  const [targetWarmupTime, setTargetWarmupTime] = useState(600);
-  const [restDuration] = useState(60);
-
-  const playAlarmSound = useAlarm();
-
-  // --- Init & Restore ---
+  // --- Effets de démarrage (aucun setState) ---
   useEffect(() => {
-    const savedHistory = localStorage.getItem('muscuGainHistory');
-    let parsedHistory = [];
-    if (savedHistory) {
-      parsedHistory = JSON.parse(savedHistory);
-      setHistory(parsedHistory);
-    }
-    const savedRoutines = localStorage.getItem('muscuGainCustomRoutines');
-    if (savedRoutines) setCustomRoutines(JSON.parse(savedRoutines));
-    const savedBody = localStorage.getItem('muscuGainBodyAnalyses');
-    if (savedBody) setBodyAnalyses(JSON.parse(savedBody));
-    const savedMeasurements = localStorage.getItem('muscuGainMeasurements');
-    if (savedMeasurements) {
-      try {
-        setMeasurements(JSON.parse(savedMeasurements));
-      } catch {
-        localStorage.removeItem('muscuGainMeasurements');
-      }
-    }
-    const savedCoach = localStorage.getItem('muscuGainCoachAnalysis');
-    if (savedCoach) {
-      try {
-        const parsed = JSON.parse(savedCoach);
-        if (parsed && parsed.date && parsed.data) setCoachAnalysis(parsed);
-      } catch {
-        localStorage.removeItem('muscuGainCoachAnalysis');
-      }
-    }
-
-    const savedSession = localStorage.getItem('muscuGainActiveSession');
-    if (savedSession) {
-      try {
-        const session = JSON.parse(savedSession);
-        if (session.activeRoutine && session.view) {
-          setActiveRoutine(session.activeRoutine);
-          setWorkoutData(session.workoutData);
-          setView(session.view);
-          setSessionStartTime(session.sessionStartTime);
-          setPhaseStartTime(session.phaseStartTime);
-          setPhaseInitialDuration(session.phaseInitialDuration);
-          setRestStartTime(session.restStartTime);
-          setRestInitialDuration(session.restInitialDuration);
-          setIsRestTimerRunning(session.isRestTimerRunning);
-          setTargetWarmupTime(session.targetWarmupTime || 600);
-        }
-      } catch {
-        localStorage.removeItem('muscuGainActiveSession');
-      }
-    }
-
-    const savedLastSession = localStorage.getItem('muscuGainLastFinishedSession');
-    if (savedLastSession) {
-      try {
-        setLastFinishedSession(JSON.parse(savedLastSession));
-      } catch {
-        localStorage.removeItem('muscuGainLastFinishedSession');
-      }
-    }
-
     requestPersistentStorage();
+    applyTheme();
+    if (launchAction) window.history.replaceState(null, '', window.location.pathname);
 
-    // --- Rappel de séance (opt-in) ---
-    if (
-      localStorage.getItem('muscuGainReminders') === '1' &&
-      typeof Notification !== 'undefined' &&
-      Notification.permission === 'granted'
-    ) {
-      const lastDateISO = parsedHistory[0]?.date;
-      const today = new Date().toISOString().slice(0, 10);
-      const lastRemindedDate = localStorage.getItem('muscuGainLastReminder');
+    // Rappel de séance (opt-in) : vérifié à l'ouverture de l'app.
+    if (loadFlag(KEYS.reminders) === '1' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      const lastDateISO = loadHistory()[0]?.date;
+      const today = localDateKey();
+      const lastRemindedDate = loadFlag(KEYS.lastReminder);
       if (shouldRemind({ lastDateISO, enabled: true, lastRemindedDate, today, now: Date.now() })) {
         fireReminder(daysSince(lastDateISO));
-        localStorage.setItem('muscuGainLastReminder', today);
+        saveFlag(KEYS.lastReminder, today);
       }
     }
+    return watchSystemTheme();
   }, []);
 
-  // --- Auto-Save ---
+  // Haut de page à chaque changement d'onglet.
   useEffect(() => {
-    if (activeRoutine && ['setup', 'warmup', 'workout', 'cooldown'].includes(view)) {
-      const sessionState = {
-        view,
-        activeRoutine,
-        workoutData,
-        sessionStartTime,
-        phaseStartTime,
-        phaseInitialDuration,
-        restStartTime,
-        restInitialDuration,
-        isRestTimerRunning,
-        targetWarmupTime,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem('muscuGainActiveSession', JSON.stringify(sessionState));
-    }
-  }, [view, activeRoutine, workoutData, sessionStartTime, phaseStartTime, restStartTime, isRestTimerRunning, targetWarmupTime, phaseInitialDuration, restInitialDuration]);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [view]);
 
-  // --- Rest Timer ---
-  useEffect(() => {
-    if (!isRestTimerRunning || !restStartTime) return;
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - restStartTime) / 1000);
-      const remaining = Math.max(0, restInitialDuration - elapsed);
-      setRestTimer(remaining);
-      if (remaining === 0) {
-        setIsRestTimerRunning(false);
-        playAlarmSound();
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      }
-    }, 200);
-    return () => clearInterval(interval);
-  }, [isRestTimerRunning, restStartTime, restInitialDuration, playAlarmSound]);
-
-  // --- Session / Phase Timer ---
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      if (view === 'workout' && sessionStartTime) {
-        setSessionDuration(Math.floor((now - sessionStartTime) / 1000));
-      } else if (view === 'cooldown' && phaseStartTime) {
-        setPhaseTimer(Math.floor((now - phaseStartTime) / 1000));
-      } else if (view === 'warmup' && phaseStartTime) {
-        const elapsed = Math.floor((now - phaseStartTime) / 1000);
-        setPhaseTimer(Math.max(0, phaseInitialDuration - elapsed));
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [view, sessionStartTime, phaseStartTime, phaseInitialDuration]);
-
-  // --- Logic ---
-  const getLastLog = useCallback((exerciseName) => {
+  // --- Logique ---
+  const getLastLog = useCallback((name) => {
     for (const session of history) {
-      if (session.exercises && session.exercises[exerciseName]) {
-        const sets = session.exercises[exerciseName];
-        for (let i = sets.length - 1; i >= 0; i--) {
-          if (sets[i].weight && sets[i].done) {
-            return { weight: sets[i].weight, reps: sets[i].reps };
-          }
-        }
+      const sets = session.exercises && session.exercises[name];
+      if (!Array.isArray(sets)) continue;
+      for (let i = sets.length - 1; i >= 0; i--) {
+        if (sets[i].weight && sets[i].done) return { weight: sets[i].weight, reps: sets[i].reps };
       }
     }
     return null;
   }, [history]);
 
   const triggerSetup = (routine) => {
-    const initialData = {};
-    routine.exercises.forEach((exEntry) => {
-      const exName = typeof exEntry === 'string' ? exEntry : exEntry.name;
-      const targetSets = typeof exEntry === 'string' ? 4 : (parseInt(exEntry.targetSets) || 4);
-      const targetReps = typeof exEntry === 'string' ? 8 : (parseInt(exEntry.targetReps) || 8);
-      const startingWeight = typeof exEntry === 'string' ? '' : (exEntry.startingWeight || '');
-      const weight = startingWeight || (getLastLog(exName) ? getLastLog(exName).weight : '');
-      initialData[exName] = [];
-      for (let i = 0; i < targetSets; i++) {
-        initialData[exName].push({ weight, reps: targetReps, done: false });
-      }
-    });
-    setWorkoutData(initialData);
-    setActiveRoutine(routine);
-    setView('setup');
+    ws.startRoutine(routine, getLastLog);
+    setView('session');
   };
 
   const startFreeSession = () => {
-    setWorkoutData({});
-    setActiveRoutine({ name: 'Séance libre', exercises: [], isCustom: false });
-    setView('setup');
-  };
-
-  const cancelSession = () => {
-    setCancelModalOpen(true);
+    ws.startFree();
+    setView('session');
   };
 
   const performCancelSession = () => {
-    localStorage.removeItem('muscuGainActiveSession');
-    setActiveRoutine(null);
-    setWorkoutData({});
+    ws.clear();
     setView('dashboard');
-    setSessionStartTime(null);
-    setPhaseStartTime(null);
-    setRestStartTime(null);
-    setIsRestTimerRunning(false);
+    showToast('Séance annulée', 'info');
   };
 
-  const confirmSetupAndStart = () => {
-    if (targetWarmupTime > 0) {
-      setPhaseStartTime(Date.now());
-      setPhaseInitialDuration(targetWarmupTime);
-      setPhaseTimer(targetWarmupTime);
-      setView('warmup');
-    } else {
-      startMainWorkout();
-    }
-  };
-
-  const startMainWorkout = () => {
-    setSessionStartTime(Date.now());
-    setSessionDuration(0);
-    setView('workout');
-  };
-
-  const finishMainWorkout = () => {
-    setPhaseStartTime(Date.now());
-    setPhaseTimer(0);
-    setView('cooldown');
-  };
-
+  // Enregistrement : idempotent (double tap, séance reprise → même id, entrée remplacée).
+  const savingRef = useRef(false);
   const saveAndExit = (notes = '') => {
-    const newEntry = {
-      date: new Date().toISOString(),
-      routineName: activeRoutine.name,
-      exercises: workoutData,
-      totalVolume: calculateVolume(workoutData),
-      durationSeconds: sessionDuration,
-      notes: (notes || '').trim(),
-    };
-    const newHistory = [newEntry, ...history];
+    const s = ws.session;
+    if (!s || savingRef.current) return;
+    savingRef.current = true;
+    const previous = history.find((h) => h.id === s.sessionId);
+    const now = Date.now();
+    const entry = buildHistoryEntry({
+      sessionId: s.sessionId,
+      routineName: s.activeRoutine?.name,
+      workoutData: s.workoutData,
+      startTime: s.sessionStartTime,
+      endTime: s.workoutEndTime || now,
+      notes: notes || previous?.notes || '',
+      now,
+    });
+    const newHistory = upsertHistoryEntry(history, entry);
     setHistory(newHistory);
-    localStorage.setItem('muscuGainHistory', JSON.stringify(newHistory));
+    persist(KEYS.history, newHistory);
 
     const lastSession = {
-      finishedAt: Date.now(),
-      activeRoutine,
-      workoutData,
-      sessionStartTime,
-      sessionDuration,
-      phaseStartTime,
-      phaseInitialDuration,
-      restStartTime,
-      restInitialDuration,
-      isRestTimerRunning,
-      targetWarmupTime,
+      finishedAt: now,
+      sessionId: s.sessionId,
+      activeRoutine: s.activeRoutine,
+      workoutData: s.workoutData,
+      sessionStartTime: s.sessionStartTime,
+      sessionDuration: entry.durationSeconds,
+      targetWarmupTime: s.targetWarmupTime,
     };
     setLastFinishedSession(lastSession);
-    localStorage.setItem('muscuGainLastFinishedSession', JSON.stringify(lastSession));
+    persist(KEYS.lastFinished, lastSession);
 
-    localStorage.removeItem('muscuGainActiveSession');
+    ws.clear();
     setView('dashboard');
-    setActiveRoutine(null);
-    setSessionStartTime(null);
-    setPhaseStartTime(null);
-    showToast('Séance enregistrée');
+    showToast(previous ? 'Séance mise à jour' : 'Séance enregistrée');
+    setTimeout(() => { savingRef.current = false; }, 500);
   };
 
-  const startRestTimer = (seconds) => {
-    const duration = seconds && seconds > 0 ? seconds : restDuration;
-    setRestInitialDuration(duration);
-    setRestStartTime(Date.now());
-    setRestTimer(duration);
-    setIsRestTimerRunning(true);
+  // --- Scanner : ajout à la séance en cours, sinon séance libre ---
+  const addFromScanner = (name) => {
+    if (ws.session) {
+      const r = ws.addExercise(name, getLastLog(name));
+      showToast(r.added ? `${r.name} ajouté à ta séance` : `${r.name} est déjà dans ta séance`, r.added ? 'success' : 'info');
+    } else {
+      ws.startFree(name, getLastLog(name));
+      showToast(`Séance libre démarrée avec ${name}`);
+    }
+    setView('session');
   };
 
-  const addTimeRest = () => {
-    setRestInitialDuration((prev) => prev + 30);
-  };
-
-  // --- Delete handlers ---
-  const requestDeleteRoutine = (id) => {
-    setConfirmModal({
-      isOpen: true,
-      type: 'routine',
-      id,
-      title: 'Supprimer ce programme ?',
-      message: 'Cette action est irréversible. Le programme sera retiré de votre liste.',
-    });
-  };
-
-  const requestDeleteHistory = (index) => {
-    setConfirmModal({
-      isOpen: true,
-      type: 'history',
-      id: index,
-      title: 'Supprimer cette séance ?',
-      message: 'Elle disparaîtra définitivement de votre historique et des statistiques.',
-    });
-  };
+  // --- Suppressions confirmées ---
+  const requestDeleteRoutine = (id) => setConfirmModal({
+    isOpen: true, type: 'routine', id,
+    title: 'Supprimer ce programme ?',
+    message: 'Cette action est irréversible. Le programme sera retiré de votre liste.',
+  });
+  const requestDeleteHistory = (id) => setConfirmModal({
+    isOpen: true, type: 'history', id,
+    title: 'Supprimer cette séance ?',
+    message: 'Elle disparaîtra définitivement de votre historique et des statistiques.',
+  });
+  const requestDeleteMeasurement = (date) => setConfirmModal({
+    isOpen: true, type: 'measurement', id: date,
+    title: 'Supprimer cette mesure ?',
+    message: 'Elle disparaîtra définitivement de vos courbes.',
+  });
 
   const handleConfirmDelete = () => {
     if (confirmModal.type === 'routine') {
       const updated = customRoutines.filter((r) => r.id !== confirmModal.id);
       setCustomRoutines(updated);
-      localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+      persist(KEYS.routines, updated);
       showToast('Programme supprimé');
     } else if (confirmModal.type === 'history') {
-      const newHistory = history.filter((_, i) => i !== confirmModal.id);
+      const newHistory = history.filter((h) => h.id !== confirmModal.id);
       setHistory(newHistory);
-      localStorage.setItem('muscuGainHistory', JSON.stringify(newHistory));
+      persist(KEYS.history, newHistory);
+      // La séance supprimée ne doit plus être « reprenable » (sinon elle réapparaîtrait).
+      if (lastFinishedSession?.sessionId === confirmModal.id) {
+        setLastFinishedSession(null);
+        remove(KEYS.lastFinished);
+      }
       showToast('Séance supprimée');
     } else if (confirmModal.type === 'measurement') {
       const updated = measurements.filter((m) => m.date !== confirmModal.id);
       setMeasurements(updated);
-      localStorage.setItem('muscuGainMeasurements', JSON.stringify(updated));
+      persist(KEYS.measurements, updated);
       showToast('Mesure supprimée');
     }
-    setConfirmModal({ ...confirmModal, isOpen: false });
+    setConfirmModal((m) => ({ ...m, isOpen: false }));
   };
 
-  // --- Import routines (depuis .xlsx) ---
+  // --- Programmes ---
+  const saveRoutines = (updated) => {
+    setCustomRoutines(updated);
+    persist(KEYS.routines, updated);
+  };
+
   // incoming: [{ name, exercises }]. Écrase un programme existant de même nom.
   const importRoutines = (incoming) => {
     let updated = [...customRoutines];
     incoming.forEach((r, i) => {
-      const routine = {
-        id: 'custom_' + Date.now() + '_' + i,
-        name: r.name,
-        desc: 'Importé depuis Excel',
-        exercises: r.exercises,
-        isCustom: true,
-      };
+      const routine = { id: 'custom_' + Date.now() + '_' + i, name: r.name, desc: 'Importé depuis Excel', exercises: r.exercises, isCustom: true };
       const idx = updated.findIndex((x) => x.name === r.name);
       if (idx >= 0) updated[idx] = routine;
       else updated = [routine, ...updated];
     });
-    setCustomRoutines(updated);
-    localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+    saveRoutines(updated);
+    showToast(`${incoming.length} programme${incoming.length > 1 ? 's' : ''} importé${incoming.length > 1 ? 's' : ''}`);
   };
 
-  // --- Programme généré par IA ---
   const addGeneratedRoutine = (program) => {
-    const routine = {
-      id: 'custom_' + Date.now(),
-      name: program.name || 'Programme IA',
-      desc: 'Généré par IA',
-      exercises: program.exercises,
-      isCustom: true,
-    };
-    const updated = [routine, ...customRoutines];
-    setCustomRoutines(updated);
-    localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+    const routine = { id: 'custom_' + Date.now(), name: program.name || 'Programme IA', desc: 'Généré par IA', exercises: program.exercises, isCustom: true };
+    saveRoutines([routine, ...customRoutines]);
     showToast('Programme généré');
   };
 
@@ -396,209 +249,216 @@ export default function App() {
     setEditingRoutine(routine);
     setView('create');
   };
-
   const startCreateRoutine = () => {
     setEditingRoutine(null);
     setView('create');
   };
-
   const duplicateRoutine = (routine) => {
-    const copy = {
-      ...routine,
-      id: 'custom_' + Date.now(),
-      name: `${routine.name} (copie)`,
-      isCustom: true,
-    };
-    const updated = [copy, ...customRoutines];
-    setCustomRoutines(updated);
-    localStorage.setItem('muscuGainCustomRoutines', JSON.stringify(updated));
+    saveRoutines([{ ...routine, id: 'custom_' + Date.now(), name: `${routine.name} (copie)`, isCustom: true }, ...customRoutines]);
+    showToast('Programme dupliqué');
   };
 
-  // --- Analyse corporelle ---
+  // --- Analyse corporelle (résultat texte uniquement, jamais la photo) ---
   const addBodyAnalysis = (entry) => {
     const updated = [entry, ...bodyAnalyses];
     setBodyAnalyses(updated);
-    localStorage.setItem('muscuGainBodyAnalyses', JSON.stringify(updated));
+    persist(KEYS.bodyAnalyses, updated);
   };
 
-  // --- Mesures corporelles ---
   const addMeasurement = (entry) => {
     const updated = upsertMeasurement(measurements, entry);
     setMeasurements(updated);
-    localStorage.setItem('muscuGainMeasurements', JSON.stringify(updated));
+    persist(KEYS.measurements, updated);
     showToast('Mesure enregistrée');
   };
 
-  const requestDeleteMeasurement = (date) => {
-    setConfirmModal({
-      isOpen: true,
-      type: 'measurement',
-      id: date,
-      title: 'Supprimer cette mesure ?',
-      message: 'Elle disparaîtra définitivement de vos courbes.',
-    });
-  };
-
-  // --- Bilan Coach IA (cache 1/jour) ---
+  // --- Bilan Coach IA (cache 1/jour, jour LOCAL) ---
   const saveCoachAnalysis = (data) => {
-    const entry = { date: new Date().toISOString().slice(0, 10), data };
+    const entry = { date: localDateKey(), data };
     setCoachAnalysis(entry);
-    localStorage.setItem('muscuGainCoachAnalysis', JSON.stringify(entry));
+    persist(KEYS.coach, entry);
   };
 
-  // --- Resume ---
-  const canResumeSession = () => {
-    if (!lastFinishedSession) return false;
-    const timeSinceFinish = Date.now() - lastFinishedSession.finishedAt;
-    return timeSinceFinish < 2 * 60 * 60 * 1000;
-  };
-
+  // --- Reprise d'une séance terminée (< 2 h) ---
+  const nowTick = useNow(60_000);
+  const resumable = !ws.session && canResume(lastFinishedSession, nowTick);
   const resumeLastSession = () => {
-    if (!canResumeSession()) return;
-    const session = lastFinishedSession;
-    setActiveRoutine(session.activeRoutine);
-    setWorkoutData(session.workoutData);
-    setSessionStartTime(session.sessionStartTime);
-    setSessionDuration(session.sessionDuration || 0);
-    setPhaseStartTime(session.phaseStartTime);
-    setPhaseInitialDuration(session.phaseInitialDuration);
-    setRestStartTime(session.restStartTime);
-    setRestInitialDuration(session.restInitialDuration);
-    setIsRestTimerRunning(session.isRestTimerRunning);
-    setTargetWarmupTime(session.targetWarmupTime || 600);
-    setView('workout');
+    if (!canResume(lastFinishedSession, Date.now())) return;
+    ws.resume(lastFinishedSession);
+    setView('session');
   };
 
-  const isSessionView = ['workout', 'warmup', 'cooldown', 'setup'].includes(view);
+  const sessionExercises = useMemo(
+    () => (ws.activeRoutine?.exercises || []).map(exerciseName),
+    [ws.activeRoutine],
+  );
+
+  const finishOnboarding = () => {
+    saveFlag(KEYS.onboarded, '1');
+    setOnboardingOpen(false);
+  };
+
+  const inSession = view === 'session' && !!ws.phase;
+  const shownView = view === 'session' && !ws.phase ? 'dashboard' : view;
 
   return (
-    <div className="min-h-screen max-w-md mx-auto bg-slate-900 p-4 pb-0 relative">
-      <InstallPrompt />
+    <div className="min-h-screen-safe max-w-md mx-auto bg-slate-900 px-4 pt-[max(1rem,env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] relative">
+      {/* Bande derrière la barre d'état iOS (texte blanc en mode standalone « black-translucent ») */}
+      <div className="fixed top-0 inset-x-0 h-safe-top bg-[#0f172a] z-[100] pointer-events-none" aria-hidden="true" />
+      <OfflineBanner />
 
-      {/* Delete confirmation modal */}
       <ConfirmationModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onClose={() => setConfirmModal((m) => ({ ...m, isOpen: false }))}
         onConfirm={handleConfirmDelete}
         title={confirmModal.title}
         message={confirmModal.message}
       />
-
-      {/* Cancel session modal */}
       <ConfirmationModal
         isOpen={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
         onConfirm={performCancelSession}
         title="Annuler la séance ?"
-        message="Votre progression actuelle sera perdue."
+        message="Les séries saisies seront perdues. Pour garder ta séance, utilise plutôt « Terminer la séance »."
         confirmLabel="Annuler la séance"
+        cancelLabel="Continuer"
       />
-
-      {/* Import routines modal */}
-      <ImportRoutineModal
-        isOpen={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
-        existingNames={customRoutines.map((r) => r.name)}
-        onConfirm={importRoutines}
+      <Suspense fallback={null}>
+        {importModalOpen && (
+          <ImportRoutineModal
+            isOpen
+            onClose={() => setImportModalOpen(false)}
+            existingNames={customRoutines.map((r) => r.name)}
+            onConfirm={importRoutines}
+          />
+        )}
+        {generateModalOpen && (
+          <GenerateProgramModal isOpen onClose={() => setGenerateModalOpen(false)} onSave={addGeneratedRoutine} />
+        )}
+      </Suspense>
+      <ScannerSheet
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        hasActiveSession={!!ws.session}
+        sessionExercises={sessionExercises}
+        onAdd={addFromScanner}
       />
-
-      {/* Generate program (IA) modal */}
-      <GenerateProgramModal
-        isOpen={generateModalOpen}
-        onClose={() => setGenerateModalOpen(false)}
-        onSave={addGeneratedRoutine}
+      <SettingsSheet
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onReplayOnboarding={() => { setSettingsOpen(false); setOnboardingOpen(true); }}
+        stats={{ sessions: history.length, routines: customRoutines.length, measurements: measurements.length, analyses: bodyAnalyses.length }}
       />
+      <Onboarding isOpen={onboardingOpen} onClose={finishOnboarding} />
 
-      {view === 'dashboard' && (
-        <Dashboard
-          history={history}
-          customRoutines={customRoutines}
-          activeRoutine={activeRoutine}
-          lastFinishedSession={lastFinishedSession}
-          setView={setView}
-          triggerSetup={triggerSetup}
-          startFreeSession={startFreeSession}
-          requestDeleteRoutine={requestDeleteRoutine}
-          resumeLastSession={resumeLastSession}
-          canResumeSession={canResumeSession}
-          onImportClick={() => setImportModalOpen(true)}
-          onGenerateClick={() => setGenerateModalOpen(true)}
-          onCreateClick={startCreateRoutine}
-          onEditRoutine={startEditRoutine}
-          onDuplicateRoutine={duplicateRoutine}
-          coachAnalysis={coachAnalysis}
-          onCoachAnalyzed={saveCoachAnalysis}
-          bodyAnalyses={bodyAnalyses}
-        />
-      )}
-      {view === 'create' && (
-        <CreateRoutine
-          setView={(v) => { setEditingRoutine(null); setView(v); }}
-          customRoutines={customRoutines}
-          setCustomRoutines={setCustomRoutines}
-          editingRoutine={editingRoutine}
-        />
-      )}
-      {view === 'setup' && (
-        <SessionSetup
-          cancelSession={cancelSession}
-          targetWarmupTime={targetWarmupTime}
-          setTargetWarmupTime={setTargetWarmupTime}
-          confirmSetupAndStart={confirmSetupAndStart}
-        />
-      )}
-      {view === 'warmup' && (
-        <Warmup
-          cancelSession={cancelSession}
-          phaseTimer={phaseTimer}
-          startMainWorkout={startMainWorkout}
-        />
-      )}
-      {view === 'workout' && (
-        <Workout
-          activeRoutine={activeRoutine}
-          setActiveRoutine={setActiveRoutine}
-          workoutData={workoutData}
-          setWorkoutData={setWorkoutData}
-          sessionDuration={sessionDuration}
-          isRestTimerRunning={isRestTimerRunning}
-          setIsRestTimerRunning={setIsRestTimerRunning}
-          restTimer={restTimer}
-          addTimeRest={addTimeRest}
-          cancelSession={cancelSession}
-          finishMainWorkout={finishMainWorkout}
-          getLastLog={getLastLog}
-          startRestTimer={startRestTimer}
-        />
-      )}
-      {view === 'cooldown' && (
-        <Cooldown
-          cancelSession={cancelSession}
-          phaseTimer={phaseTimer}
-          sessionDuration={sessionDuration}
-          workoutData={workoutData}
-          saveAndExit={saveAndExit}
-          history={history}
-        />
-      )}
-      {view === 'history' && (
-        <History
-          history={history}
-          requestDeleteHistory={requestDeleteHistory}
-        />
-      )}
-      {view === 'body' && (
-        <BodyAnalysis
-          bodyAnalyses={bodyAnalyses}
-          addBodyAnalysis={addBodyAnalysis}
-          measurements={measurements}
-          addMeasurement={addMeasurement}
-          requestDeleteMeasurement={requestDeleteMeasurement}
-          history={history}
-        />
-      )}
+      <main id="main">
+        {shownView === 'dashboard' && (
+          <Dashboard
+            history={history}
+            customRoutines={customRoutines}
+            activeRoutine={ws.activeRoutine}
+            sessionPhase={ws.phase}
+            sessionDuration={ws.sessionDuration}
+            lastFinishedSession={lastFinishedSession}
+            resumable={resumable}
+            triggerSetup={triggerSetup}
+            startFreeSession={startFreeSession}
+            openSession={() => setView('session')}
+            openScanner={() => setScannerOpen(true)}
+            openSettings={() => setSettingsOpen(true)}
+            requestDeleteRoutine={requestDeleteRoutine}
+            resumeLastSession={resumeLastSession}
+            onImportClick={() => setImportModalOpen(true)}
+            onGenerateClick={() => setGenerateModalOpen(true)}
+            onCreateClick={startCreateRoutine}
+            onEditRoutine={startEditRoutine}
+            onDuplicateRoutine={duplicateRoutine}
+            coachAnalysis={coachAnalysis}
+            onCoachAnalyzed={saveCoachAnalysis}
+            bodyAnalyses={bodyAnalyses}
+          />
+        )}
+        <Suspense fallback={<Loading />}>
+          {shownView === 'create' && (
+            <CreateRoutine
+              setView={(v) => { setEditingRoutine(null); setView(v); }}
+              customRoutines={customRoutines}
+              saveRoutines={saveRoutines}
+              editingRoutine={editingRoutine}
+            />
+          )}
+          {shownView === 'history' && (
+            <History history={history} requestDeleteHistory={requestDeleteHistory} />
+          )}
+          {shownView === 'body' && (
+            <BodyAnalysis
+              bodyAnalyses={bodyAnalyses}
+              addBodyAnalysis={addBodyAnalysis}
+              measurements={measurements}
+              addMeasurement={addMeasurement}
+              requestDeleteMeasurement={requestDeleteMeasurement}
+              history={history}
+            />
+          )}
+        </Suspense>
+        {inSession && ws.phase === 'setup' && (
+          <SessionSetup
+            routineName={ws.activeRoutine?.name}
+            exerciseCount={sessionExercises.length}
+            cancelSession={() => setCancelModalOpen(true)}
+            targetWarmupTime={ws.targetWarmupTime}
+            setTargetWarmupTime={ws.setTargetWarmupTime}
+            confirmSetupAndStart={ws.confirmSetup}
+          />
+        )}
+        {inSession && ws.phase === 'warmup' && (
+          <Warmup cancelSession={() => setCancelModalOpen(true)} phaseTimer={ws.phaseTimer} startMainWorkout={ws.startMainWorkout} />
+        )}
+        {inSession && ws.phase === 'workout' && (
+          <Workout
+            activeRoutine={ws.activeRoutine}
+            workoutData={ws.workoutData}
+            setWorkoutData={ws.setWorkoutData}
+            sessionDuration={ws.sessionDuration}
+            isRestTimerRunning={ws.isRestTimerRunning}
+            skipRest={ws.skipRest}
+            restTimer={ws.restTimer}
+            addTimeRest={() => ws.addRestTime(30)}
+            cancelSession={() => setCancelModalOpen(true)}
+            leaveSession={() => setView('dashboard')}
+            finishMainWorkout={ws.finishMainWorkout}
+            getLastLog={getLastLog}
+            startRestTimer={ws.startRest}
+            addExercise={(name) => ws.addExercise(name, getLastLog(name))}
+            openScanner={() => setScannerOpen(true)}
+          />
+        )}
+        {inSession && ws.phase === 'cooldown' && (
+          <Cooldown
+            cancelSession={() => setCancelModalOpen(true)}
+            backToWorkout={ws.startMainWorkout}
+            phaseTimer={ws.phaseTimer}
+            sessionDuration={ws.sessionDuration}
+            workoutData={ws.workoutData}
+            saveAndExit={saveAndExit}
+            history={history}
+            previousNotes={history.find((h) => h.id === ws.session?.sessionId)?.notes || ''}
+          />
+        )}
+      </main>
 
-      {!isSessionView && <NavBar view={view} setView={setView} activeRoutine={activeRoutine} />}
+      {!inSession && (
+        <>
+          <InstallPrompt />
+          <NavBar
+            view={shownView}
+            setView={setView}
+            hasActiveSession={!!ws.session}
+            openSession={() => setView('session')}
+            openScanner={() => setScannerOpen(true)}
+          />
+        </>
+      )}
     </div>
   );
 }

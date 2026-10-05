@@ -84,6 +84,8 @@ test('canResume : fenêtre 2 h et sessionId obligatoire', () => {
   assert.equal(canResume(last, now), true);
   assert.equal(canResume({ ...last, finishedAt: now - 3 * 3600_000 }, now), false);
   assert.equal(canResume({ ...last, sessionId: undefined }, now), false);
+  assert.equal(canResume({ ...last, finishedAt: now + 30_000 }, now), true); // horloge d'affichage en retard
+  assert.equal(canResume({ ...last, finishedAt: now + 10 * 60_000 }, now), false);
   assert.equal(canResume(null, now), false);
 });
 

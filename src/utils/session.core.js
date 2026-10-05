@@ -127,7 +127,9 @@ export function resolveRestState({ isRestTimerRunning, restStartTime, restInitia
 export function canResume(lastFinished, now = Date.now(), windowMs = RESUME_WINDOW_MS) {
   if (!lastFinished || !lastFinished.activeRoutine || !lastFinished.sessionId) return false;
   const t = Number(lastFinished.finishedAt);
-  return Number.isFinite(t) && now - t >= 0 && now - t < windowMs;
+  // Tolère une horloge d'affichage en retard (rafraîchie toutes les 60 s) : -2 min admis.
+  const age = now - t;
+  return Number.isFinite(t) && age > -120000 && age < windowMs;
 }
 
 // Valide une séance active restaurée depuis le stockage ; null si inexploitable.

@@ -1,22 +1,28 @@
 import { useMemo, useState } from 'react';
-import { Wind, X, Trophy, Dumbbell } from 'lucide-react';
+import { Wind, X, Trophy, Dumbbell, ChevronLeft } from 'lucide-react';
 import Button from '../components/ui/Button';
+import IconButton from '../components/ui/IconButton';
 import { formatTime, formatDuration, calculateVolume } from '../utils/format';
 import { detectNewPRs, detectRepPRs } from '../utils/records.core';
 
-export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, workoutData, saveAndExit, history }) {
+export default function Cooldown({ cancelSession, backToWorkout, phaseTimer, sessionDuration, workoutData, saveAndExit, history, previousNotes = '' }) {
   // Memo : la vue re-render 2×/s (timers App), pas besoin de rescanner l'historique.
   const newPRs = useMemo(() => detectNewPRs(history || [], { exercises: workoutData }), [history, workoutData]);
   const repPRs = useMemo(() => detectRepPRs(history || [], { exercises: workoutData }), [history, workoutData]);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(previousNotes);
+  const [saving, setSaving] = useState(false);
+  const doneSets = Object.values(workoutData).flat().filter((s) => s && s.done).length;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center fade-in pb-24 relative">
-      <button onClick={cancelSession} className="absolute top-6 left-6 text-slate-400 hover:text-white z-20"><X size={24} /></button>
+    <div className="min-h-screen-safe flex flex-col items-center justify-center py-6 text-center fade-in pb-24 relative">
+      <div className="absolute top-0 inset-x-0 flex justify-between z-20">
+        <IconButton label="Retour à la séance" onClick={backToWorkout}><ChevronLeft size={24} /></IconButton>
+        <IconButton label="Annuler la séance" tone="danger" onClick={cancelSession}><X size={22} /></IconButton>
+      </div>
       <div className="bg-blue-400/10 p-6 rounded-full mb-6">
         <Wind size={64} className="text-blue-400" />
       </div>
-      <h2 className="text-3xl font-bold text-white mb-2">Récupération</h2>
+      <h1 className="text-3xl font-bold text-white mb-2">Récupération</h1>
       <div className="text-6xl font-mono font-bold text-blue-300 mb-8 tabular-nums">{formatTime(phaseTimer)}</div>
 
       {newPRs.length > 0 && (
@@ -60,9 +66,15 @@ export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, w
           <div className="text-xl font-bold text-green-400">{Math.round(calculateVolume(workoutData))} kg</div>
         </div>
       </div>
+      {doneSets === 0 && (
+        <p role="status" className="w-full max-w-sm mb-4 text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-left">
+          Aucune série validée : la séance sera enregistrée avec un volume de 0 kg.
+        </p>
+      )}
       <div className="w-full max-w-sm mb-4 text-left">
-        <label className="block text-xs text-slate-500 uppercase font-bold mb-1">Notes (optionnel)</label>
+        <label htmlFor="session-notes" className="block text-xs text-slate-500 uppercase font-bold mb-1">Notes (optionnel)</label>
         <textarea
+          id="session-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
@@ -70,8 +82,14 @@ export default function Cooldown({ cancelSession, phaseTimer, sessionDuration, w
           className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-white placeholder-slate-600 focus:border-blue-500 outline-none resize-none"
         />
       </div>
-      <Button fullWidth onClick={() => saveAndExit(notes)} className="bg-green-600 hover:bg-green-500 shadow-green-900/50 max-w-sm">
-        Enregistrer et Quitter
+      <Button
+        fullWidth
+        variant="success"
+        disabled={saving}
+        onClick={() => { setSaving(true); saveAndExit(notes); }}
+        className="max-w-sm"
+      >
+        Enregistrer et quitter
       </Button>
     </div>
   );
