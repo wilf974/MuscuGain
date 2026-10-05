@@ -1,25 +1,26 @@
-import { flattenExercises, normalizeResult } from './recognizeMachine.core.js';
+import { flattenExercises, normalizeResult, recognizeErrorKind, RECOGNIZE_MESSAGES as MESSAGES } from './recognizeMachine.core.js';
 
 export { flattenExercises };
 
-const MESSAGES = {
-  unavailable: 'Reconnaissance indisponible, choisis manuellement.',
-  ratelimit: 'Trop de tentatives, réessaie dans 1 min.',
-  empty: 'Machine non reconnue, choisis manuellement.',
-  image: 'Image illisible, réessaie avec une autre photo.',
-};
+// Au-delà, on abandonne côté client (backend ~45 s, nginx 90 s).
+export const RECOGNIZE_TIMEOUT_MS = 60000;
 
 export class RecognizeError extends Error {
   constructor(kind, message) {
-    super(message);
+    super(message || MESSAGES[kind] || MESSAGES.unavailable);
     this.name = 'RecognizeError';
     this.kind = kind;
   }
 }
 
 // File -> canvas (resize max px, ratio conservé) -> dataURL JPEG.
+// La photo ne quitte la mémoire que pour l'appel IA : rien n'est écrit sur l'appareil.
 export function fileToDataUrl(file, max = 768, quality = 0.72) {
   return new Promise((resolve, reject) => {
+    if (!file || (file.type && !file.type.startsWith('image/'))) {
+      reject(new RecognizeError('image', MESSAGES.image));
+      return;
+    }
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -34,7 +35,11 @@ export function fileToDataUrl(file, max = 768, quality = 0.72) {
       canvas.width = width;
       canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      // Libère le bitmap (mémoire limitée sur iPhone).
+      canvas.width = 0;
+      canvas.height = 0;
+      resolve(dataUrl);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -44,23 +49,43 @@ export function fileToDataUrl(file, max = 768, quality = 0.72) {
   });
 }
 
+const isOnline = () => typeof navigator === 'undefined' || navigator.onLine !== false;
+
 // Reconnaît la machine sur la photo. Retourne { label, candidates } (>=1 candidat) ou lève RecognizeError.
-export async function recognizeMachine(file, allowedExercises) {
-  const image = await fileToDataUrl(file, 1280, 0.85);
+// `signal` (optionnel) permet à l'UI d'annuler ; un délai max s'applique en plus.
+export async function recognizeMachine(file, allowedExercises, { signal, timeoutMs = RECOGNIZE_TIMEOUT_MS } = {}) {
+  if (!isOnline()) throw new RecognizeError('offline');
+  let image = await fileToDataUrl(file, 1280, 0.85);
+  if (signal && signal.aborted) throw new RecognizeError('cancelled');
+
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, timeoutMs);
+  const onAbort = () => ctrl.abort();
+  if (signal) signal.addEventListener('abort', onAbort, { once: true });
+
   let res;
   try {
+    const body = JSON.stringify({ image, allowedExercises });
+    image = null; // ne garde pas la photo en mémoire plus que nécessaire
     res = await fetch('/api/recognize-exercise', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, allowedExercises }),
+      body,
+      signal: ctrl.signal,
+      cache: 'no-store',
     });
   } catch {
-    throw new RecognizeError('unavailable', MESSAGES.unavailable);
+    const kind = recognizeErrorKind({ online: isOnline(), aborted: !!(signal && signal.aborted), timedOut, networkError: true });
+    throw new RecognizeError(kind);
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', onAbort);
   }
-  if (res.status === 429) throw new RecognizeError('ratelimit', MESSAGES.ratelimit);
-  if (!res.ok) throw new RecognizeError('unavailable', MESSAGES.unavailable);
+  const kind = recognizeErrorKind({ status: res.status });
+  if (kind) throw new RecognizeError(kind);
   const json = await res.json().catch(() => null);
   const result = normalizeResult(json);
-  if (!result.candidates.length) throw new RecognizeError('empty', MESSAGES.empty);
+  if (!result.candidates.length) throw new RecognizeError('empty');
   return result;
 }
