@@ -86,7 +86,7 @@ export default function Cooldown({ cancelSession, backToWorkout, phaseTimer, ses
         fullWidth
         variant="success"
         disabled={saving}
-        onClick={() => { setSaving(true); saveAndExit(notes); }}
+        onClick={() => { setSaving(true); if (saveAndExit(notes) === false) setSaving(false); }}
         className="max-w-sm"
       >
         Enregistrer et quitter

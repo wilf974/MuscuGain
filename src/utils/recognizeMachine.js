@@ -64,27 +64,32 @@ export async function recognizeMachine(file, allowedExercises, { signal, timeout
   const onAbort = () => ctrl.abort();
   if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
-  let res;
+  // Le délai max et l'annulation couvrent l'envoi ET la lecture de la réponse.
+  let json;
   try {
-    const body = JSON.stringify({ image, allowedExercises });
-    image = null; // ne garde pas la photo en mémoire plus que nécessaire
-    res = await fetch('/api/recognize-exercise', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      signal: ctrl.signal,
-      cache: 'no-store',
-    });
-  } catch {
-    const kind = recognizeErrorKind({ online: isOnline(), aborted: !!(signal && signal.aborted), timedOut, networkError: true });
-    throw new RecognizeError(kind);
+    let res;
+    try {
+      const body = JSON.stringify({ image, allowedExercises });
+      image = null; // ne garde pas la photo en mémoire plus que nécessaire
+      res = await fetch('/api/recognize-exercise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: ctrl.signal,
+        cache: 'no-store',
+      });
+    } catch {
+      const kind = recognizeErrorKind({ online: isOnline(), aborted: !!(signal && signal.aborted), timedOut, networkError: true });
+      throw new RecognizeError(kind);
+    }
+    const kind = recognizeErrorKind({ status: res.status });
+    if (kind) throw new RecognizeError(kind);
+    json = await res.json().catch(() => null);
+    if (ctrl.signal.aborted) throw new RecognizeError(timedOut ? 'timeout' : 'cancelled');
   } finally {
     clearTimeout(timer);
     if (signal) signal.removeEventListener('abort', onAbort);
   }
-  const kind = recognizeErrorKind({ status: res.status });
-  if (kind) throw new RecognizeError(kind);
-  const json = await res.json().catch(() => null);
   const result = normalizeResult(json);
   if (!result.candidates.length) throw new RecognizeError('empty');
   return result;

@@ -11,6 +11,14 @@ export function newId(prefix = 's', now = Date.now(), rand = Math.random) {
   return `${prefix}_${now.toString(36)}_${Math.floor(rand() * 1e8).toString(36)}`;
 }
 
+// Saisie iOS : le clavier décimal FR tape une virgule → stockage avec un seul point (calculs de volume).
+export function sanitizeWeightInput(v) {
+  const s = String(v ?? '').replace(/,/g, '.').replace(/[^0-9.]/g, '');
+  const [head, ...rest] = s.split('.');
+  return rest.length ? `${head}.${rest.join('')}` : head;
+}
+export const sanitizeRepsInput = (v) => String(v ?? '').replace(/[^0-9]/g, '');
+
 export const exerciseName = (entry) => (typeof entry === 'string' ? entry : entry && entry.name) || '';
 
 // Séries initiales d'un programme (poids : charge de départ, sinon dernier poids réalisé).

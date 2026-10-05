@@ -33,6 +33,7 @@ export default function Sheet({
   labelledBy,
 }) {
   const panelRef = useRef(null);
+  const pressOnBackdrop = useRef(false);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
   const sheetId = useId();
@@ -61,7 +62,11 @@ export default function Sheet({
         if (!items.length) return;
         const firstEl = items[0];
         const lastEl = items[items.length - 1];
-        if (e.shiftKey && document.activeElement === firstEl) {
+        // Focus sur le panneau lui-même ou hors de la feuille : on le ramène dedans.
+        if (document.activeElement === panel || !panel.contains(document.activeElement)) {
+          e.preventDefault();
+          (e.shiftKey ? lastEl : firstEl).focus();
+        } else if (e.shiftKey && document.activeElement === firstEl) {
           e.preventDefault();
           lastEl.focus();
         } else if (!e.shiftKey && document.activeElement === lastEl) {
@@ -87,7 +92,13 @@ export default function Sheet({
   return createPortal(
     <div
       className={`fixed inset-0 ${z} flex items-end sm:items-center justify-center sm:p-4 bg-black/70 backdrop-blur-sm fade-in`}
-      onClick={dismissible ? () => onCloseRef.current?.() : undefined}
+      // Fermeture seulement si le geste COMMENCE et finit sur le fond (une sélection de texte
+      // qui déborde du panneau ne doit pas fermer la feuille ni perdre la saisie).
+      onPointerDown={(e) => { pressOnBackdrop.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (dismissible && pressOnBackdrop.current && e.target === e.currentTarget) onCloseRef.current?.();
+        pressOnBackdrop.current = false;
+      }}
     >
       <div
         ref={panelRef}

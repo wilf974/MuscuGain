@@ -7,11 +7,8 @@ import AddExerciseModal from '../components/modals/AddExerciseModal';
 import { formatTime } from '../utils/format';
 import { suggestLoad } from '../utils/coach.core';
 import { videoIdFor } from '../utils/scanner.core';
-import { exerciseName } from '../utils/session.core';
+import { exerciseName, sanitizeWeightInput, sanitizeRepsInput } from '../utils/session.core';
 
-// Saisie iOS : clavier décimal → virgule française ; on stocke avec un point (calculs de volume).
-const normalizeDecimal = (v) => v.replace(',', '.').replace(/[^0-9.]/g, '');
-const normalizeInt = (v) => v.replace(/[^0-9]/g, '');
 
 export default function Workout({
   activeRoutine,
@@ -85,7 +82,10 @@ export default function Workout({
     setShowAddExerciseModal(false);
   };
 
-  const exercises = activeRoutine.exercises || [];
+  // Dédoublonnage par nom (routines importées/anciennes pouvant lister 2× le même exercice).
+  const exercises = (activeRoutine.exercises || []).filter(
+    (e, i, arr) => arr.findIndex((x) => exerciseName(x) === exerciseName(e)) === i,
+  );
   const doneSets = Object.values(workoutData).flat().filter((s) => s && s.done).length;
   const totalSets = Object.values(workoutData).flat().length;
 
@@ -244,7 +244,7 @@ export default function Workout({
                       autoComplete="off"
                       placeholder="0"
                       value={set.weight}
-                      onChange={(e) => updateSet(exName, setIndex, 'weight', normalizeDecimal(e.target.value))}
+                      onChange={(e) => updateSet(exName, setIndex, 'weight', sanitizeWeightInput(e.target.value))}
                       aria-label={`${exName}, série ${setIndex + 1}, poids en kg`}
                       className="w-full min-h-11 bg-slate-900 border border-slate-700 rounded-lg px-2 text-center text-white focus:border-blue-500 outline-none font-bold tabular-nums"
                     />
@@ -256,7 +256,7 @@ export default function Workout({
                       autoComplete="off"
                       placeholder="0"
                       value={set.reps}
-                      onChange={(e) => updateSet(exName, setIndex, 'reps', normalizeInt(e.target.value))}
+                      onChange={(e) => updateSet(exName, setIndex, 'reps', sanitizeRepsInput(e.target.value))}
                       aria-label={`${exName}, série ${setIndex + 1}, répétitions`}
                       className="w-full min-h-11 bg-slate-900 border border-slate-700 rounded-lg px-2 text-center text-white focus:border-blue-500 outline-none tabular-nums"
                     />

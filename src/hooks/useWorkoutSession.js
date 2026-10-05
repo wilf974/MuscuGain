@@ -22,24 +22,34 @@ function restore() {
   const raw = normalizeActiveSession(load(KEYS.activeSession, null, isObject));
   if (!raw) return null;
   const rest = resolveRestState(raw, Date.now());
+  // Séance v1 sauvegardée en récupération : pas de workoutEndTime → on fige la durée au début de la récup.
+  const workoutEndTime = raw.workoutEndTime || (raw.view === 'cooldown' ? raw.phaseStartTime || null : null);
   return {
     ...EMPTY_TIMERS,
     ...raw,
+    workoutEndTime,
     isRestTimerRunning: rest.running,
     targetWarmupTime: Number.isFinite(raw.targetWarmupTime) ? raw.targetWarmupTime : 600,
   };
 }
 
-export default function useWorkoutSession({ onRestEnd } = {}) {
+export default function useWorkoutSession({ onRestEnd, onPersistError } = {}) {
   const [session, setSession] = useState(restore);
   const [now, setNow] = useState(() => Date.now());
   const onRestEndRef = useRef(onRestEnd);
-  useEffect(() => { onRestEndRef.current = onRestEnd; }, [onRestEnd]);
+  const onPersistErrorRef = useRef(onPersistError);
+  useEffect(() => {
+    onRestEndRef.current = onRestEnd;
+    onPersistErrorRef.current = onPersistError;
+  }, [onRestEnd, onPersistError]);
 
   // --- Sauvegarde immédiate (chaque série cochée, chaque poids saisi) ---
   useEffect(() => {
-    if (session) save(KEYS.activeSession, { ...session, timestamp: Date.now() });
-    else remove(KEYS.activeSession);
+    if (session) {
+      if (!save(KEYS.activeSession, { ...session, timestamp: Date.now() })) onPersistErrorRef.current?.();
+    } else {
+      remove(KEYS.activeSession);
+    }
   }, [session]);
 
   // --- Horloge : tick tant qu'une séance est active ---
@@ -126,11 +136,15 @@ export default function useWorkoutSession({ onRestEnd } = {}) {
     const s = sessionRef.current;
     if (!s) return { added: false, name };
     const r = addExerciseToSession({ workoutData: s.workoutData, routine: s.activeRoutine }, name, { lastLog });
-    if (r.routine !== s.activeRoutine || r.workoutData !== s.workoutData) {
-      const next = { ...s, workoutData: r.workoutData, activeRoutine: r.routine };
-      sessionRef.current = next;
-      setSession(next);
-    }
+    // Mise à jour fonctionnelle (idempotente) : ne peut pas écraser une saisie en attente du même lot.
+    setSession((cur) => {
+      if (!cur) return cur;
+      const x = addExerciseToSession({ workoutData: cur.workoutData, routine: cur.activeRoutine }, name, { lastLog });
+      if (x.routine === cur.activeRoutine && x.workoutData === cur.workoutData) return cur;
+      // Ajout pendant la récupération : retour en séance pour pouvoir saisir les séries.
+      const back = cur.view === 'cooldown' ? { view: 'workout', workoutEndTime: null } : {};
+      return { ...cur, ...back, workoutData: x.workoutData, activeRoutine: x.routine };
+    });
     return { added: r.added, name: r.name };
   }, []);
 
@@ -146,14 +160,16 @@ export default function useWorkoutSession({ onRestEnd } = {}) {
   const clear = useCallback(() => setSession(null), []);
 
   // Reprise d'une séance terminée (< 2 h) : même sessionId → l'enregistrement remplacera l'entrée.
+  // Le chrono repart de la durée déjà faite (la pause entre fin et reprise n'est pas comptée).
   const resume = useCallback((last) => {
+    const done = Number(last.sessionDuration) > 0 ? Number(last.sessionDuration) * 1000 : 0;
     setSession({
       ...EMPTY_TIMERS,
       sessionId: last.sessionId,
       view: 'workout',
       activeRoutine: last.activeRoutine,
       workoutData: last.workoutData || {},
-      sessionStartTime: last.sessionStartTime || Date.now(),
+      sessionStartTime: Date.now() - done,
       targetWarmupTime: last.targetWarmupTime || 600,
     });
   }, []);

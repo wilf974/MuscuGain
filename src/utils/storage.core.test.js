@@ -71,6 +71,14 @@ test('migrateStorage : historique corrompu mis de côté, reprise orpheline reti
   assert.equal(s.getItem(KEYS.lastFinished), null);
 });
 
+test('migrateStorage : historique corrompu + quota plein → rien d’écrasé, nouvel essai au lancement suivant', () => {
+  const s = fakeStore({ [KEYS.history]: '{corrompu' }, { quota: 5 });
+  const r = migrateStorage(s);
+  assert.equal(r.error, 'quota');
+  assert.equal(s.getItem(KEYS.history), '{corrompu');
+  assert.equal(s.getItem(KEYS.schema), null);
+});
+
 test('migrateStorage sur stockage vierge : version posée, rien d\'autre', () => {
   const s = fakeStore();
   migrateStorage(s);

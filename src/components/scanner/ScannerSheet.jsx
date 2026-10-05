@@ -56,6 +56,8 @@ function ScannerBody({ onClose, hasActiveSession, sessionExercises, onAdd }) {
     abortRef.current = ctrl;
     try {
       const raw = await recognizeMachine(file, allKnownNames(custom), { signal: ctrl.signal });
+      // Annulée (ou remplacée par une nouvelle photo) pendant la lecture de la réponse : on ignore.
+      if (ctrl.signal.aborted || abortRef.current !== ctrl) return;
       const r = classifyRecognition(raw, index);
       setReco(r);
       if (r.level === 'none') {
@@ -66,6 +68,7 @@ function ScannerBody({ onClose, hasActiveSession, sessionExercises, onAdd }) {
         setPhase(r.level === 'high' ? 'detail' : 'result');
       }
     } catch (err) {
+      if (abortRef.current !== ctrl) return;
       if (ctrl.signal.aborted && !(err instanceof RecognizeError && err.kind === 'timeout')) {
         setPhase('pick');
         return;
@@ -73,12 +76,13 @@ function ScannerBody({ onClose, hasActiveSession, sessionExercises, onAdd }) {
       setErrorKind(err instanceof RecognizeError ? err.kind : 'unavailable');
       setPhase('error');
     } finally {
-      abortRef.current = null;
+      if (abortRef.current === ctrl) abortRef.current = null;
     }
   };
 
   const cancelAnalysis = () => {
     abortRef.current?.abort();
+    abortRef.current = null;
     setPhase('pick');
   };
 

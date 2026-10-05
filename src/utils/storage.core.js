@@ -124,8 +124,14 @@ export function migrateStorage(store, { now = Date.now(), newId } = {}) {
       history = normalizeHistory(parsed);
       if (writeJSON(store, KEYS.history, history)) changed.push('history');
     } else {
-      // Illisible : on garde la donnée brute à part au lieu de la perdre.
-      try { store.setItem(KEYS.historyCorrupt, rawHistory); changed.push('historyCorrupt'); } catch { /* quota */ }
+      // Illisible : on garde la donnée brute à part au lieu de la perdre. Si la copie échoue (quota),
+      // on ne touche à rien et on retentera au prochain lancement (version non incrémentée).
+      try {
+        store.setItem(KEYS.historyCorrupt, rawHistory);
+        changed.push('historyCorrupt');
+      } catch {
+        return { from, to: from, changed, error: 'quota' };
+      }
       writeJSON(store, KEYS.history, []);
     }
   }

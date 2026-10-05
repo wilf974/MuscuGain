@@ -4,7 +4,17 @@ import assert from 'node:assert/strict';
 import {
   buildInitialWorkoutData, addExerciseToSession, buildHistoryEntry, upsertHistoryEntry,
   restRemaining, resolveRestState, canResume, normalizeActiveSession, durationSeconds, newId,
+  sanitizeWeightInput, sanitizeRepsInput,
 } from './session.core.js';
+
+test('saisie iOS : virgule → point, un seul séparateur, reps entières', () => {
+  assert.equal(sanitizeWeightInput('82,5'), '82.5');
+  assert.equal(sanitizeWeightInput('1..2.3'), '1.23');
+  assert.equal(sanitizeWeightInput('1.5,2'), '1.52');
+  assert.equal(sanitizeWeightInput('abc'), '');
+  assert.equal(sanitizeWeightInput(100), '100');
+  assert.equal(sanitizeRepsInput('12a'), '12');
+});
 
 test('buildInitialWorkoutData : séries cibles, charge de départ puis dernier log', () => {
   const routine = { exercises: [{ name: 'Squat', targetSets: 3, targetReps: 5 }, 'Curl', { name: 'Bench', startingWeight: '60' }] };

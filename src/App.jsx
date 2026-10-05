@@ -47,7 +47,14 @@ export default function App() {
     playAlarmSound();
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   }, [playAlarmSound]);
-  const ws = useWorkoutSession({ onRestEnd });
+  // Alerte stockage plein pendant la séance (au plus 1 fois / 30 s, sinon un toast par frappe).
+  const lastPersistAlert = useRef(0);
+  const onPersistError = useCallback(() => {
+    if (Date.now() - lastPersistAlert.current < 30000) return;
+    lastPersistAlert.current = Date.now();
+    showToast('Stockage plein : la séance en cours n’est plus sauvegardée', 'error');
+  }, [showToast]);
+  const ws = useWorkoutSession({ onRestEnd, onPersistError });
 
   // view : 'dashboard' | 'history' | 'body' | 'create' | 'session' (étape = ws.phase)
   const [view, setView] = useState(() => (ws.phase ? 'session' : 'dashboard'));
@@ -70,9 +77,11 @@ export default function App() {
   const [onboardingOpen, setOnboardingOpen] = useState(
     () => !loadFlag(KEYS.onboarded) && loadHistory().length === 0 && launchAction !== 'scan');
 
-  // Écriture + alerte si le stockage est plein (mode privé, quota iOS).
+  // Écriture + alerte si le stockage est plein (mode privé, quota iOS). Renvoie true si écrit.
   const persist = useCallback((key, value) => {
-    if (!save(key, value)) showToast('Stockage plein : donnée non sauvegardée', 'error');
+    const ok = save(key, value);
+    if (!ok) showToast('Stockage plein : donnée non sauvegardée', 'error');
+    return ok;
   }, [showToast]);
 
   // --- Effets de démarrage (aucun setState) ---
@@ -141,12 +150,16 @@ export default function App() {
       workoutData: s.workoutData,
       startTime: s.sessionStartTime,
       endTime: s.workoutEndTime || now,
-      notes: notes || previous?.notes || '',
+      notes: notes ?? previous?.notes ?? '',
       now,
     });
     const newHistory = upsertHistoryEntry(history, entry);
+    // Échec d'écriture (quota) : on NE ferme PAS la séance, sinon elle serait perdue au rechargement.
+    if (!persist(KEYS.history, newHistory)) {
+      savingRef.current = false;
+      return false;
+    }
     setHistory(newHistory);
-    persist(KEYS.history, newHistory);
 
     const lastSession = {
       finishedAt: now,
@@ -164,6 +177,7 @@ export default function App() {
     setView('dashboard');
     showToast(previous ? 'Séance mise à jour' : 'Séance enregistrée');
     setTimeout(() => { savingRef.current = false; }, 500);
+    return true;
   };
 
   // --- Scanner : ajout à la séance en cours, sinon séance libre ---
