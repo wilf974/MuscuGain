@@ -1,28 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
-import { FileSpreadsheet, Upload, AlertTriangle, Check, Loader2, X } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { FileSpreadsheet, Upload, AlertTriangle, Check, Loader2 } from 'lucide-react';
 import Button from '../ui/Button';
+import Sheet from '../ui/Sheet';
 import { parseWorkbook } from '../../utils/parseWorkbook';
 
+// Le contenu est démonté à la fermeture → état réinitialisé sans effet.
 export default function ImportRoutineModal({ isOpen, onClose, existingNames = [], onConfirm }) {
+  return (
+    <Sheet isOpen={isOpen} onClose={onClose} title="Importer depuis Excel" icon={FileSpreadsheet}>
+      {isOpen && <ImportBody onClose={onClose} existingNames={existingNames} onConfirm={onConfirm} />}
+    </Sheet>
+  );
+}
+
+function ImportBody({ onClose, existingNames, onConfirm }) {
   const [sheets, setSheets] = useState([]);
   const [checked, setChecked] = useState({});
   const [parsing, setParsing] = useState(false);
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
   const inputRef = useRef(null);
-
-  // Reset complet à chaque ouverture/fermeture.
-  useEffect(() => {
-    if (!isOpen) {
-      setSheets([]);
-      setChecked({});
-      setParsing(false);
-      setError('');
-      setFileName('');
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const existing = new Set(existingNames);
 
@@ -67,23 +64,12 @@ export default function ImportRoutineModal({ isOpen, onClose, existingNames = []
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in" onClick={onClose}>
-      <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center gap-3 p-6 pb-4 border-b border-slate-700/50">
-          <FileSpreadsheet size={24} className="text-blue-400 shrink-0" />
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-white leading-tight">Importer depuis Excel</h3>
-            <p className="text-xs text-slate-400 mt-0.5">1 feuille = 1 programme</p>
-          </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 pt-4 overflow-y-auto">
+    <div>
+          <p className="text-xs text-slate-400 -mt-1 mb-3">1 feuille = 1 programme</p>
           {/* File picker */}
-          <input ref={inputRef} type="file" accept=".xlsx" onChange={handleFile} className="hidden" />
+          <input ref={inputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFile} className="hidden" aria-hidden="true" tabIndex={-1} />
           <button
+            type="button"
             onClick={() => inputRef.current?.click()}
             className="w-full border-2 border-dashed border-slate-600 hover:border-blue-500 rounded-xl p-5 flex flex-col items-center gap-2 text-slate-400 hover:text-blue-400 transition-colors group"
           >
@@ -93,13 +79,13 @@ export default function ImportRoutineModal({ isOpen, onClose, existingNames = []
           </button>
 
           {parsing && (
-            <div className="flex items-center justify-center gap-2 text-slate-400 mt-5 text-sm">
+            <div role="status" className="flex items-center justify-center gap-2 text-slate-400 mt-5 text-sm">
               <Loader2 size={18} className="animate-spin" /> Lecture du fichier…
             </div>
           )}
 
           {error && (
-            <div className="flex items-start gap-2 mt-5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+            <div role="alert" className="flex items-start gap-2 mt-5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
               <AlertTriangle size={18} className="shrink-0 mt-0.5" /> {error}
             </div>
           )}
@@ -112,7 +98,7 @@ export default function ImportRoutineModal({ isOpen, onClose, existingNames = []
                   {sheets.length} feuille{sheets.length > 1 ? 's' : ''} détectée{sheets.length > 1 ? 's' : ''}
                 </span>
                 {selectable.length > 0 && (
-                  <button onClick={toggleAll} className="text-xs text-blue-400 hover:text-blue-300 font-semibold">
+                  <button type="button" onClick={toggleAll} className="min-h-11 px-2 text-xs text-blue-400 hover:text-blue-300 font-semibold">
                     {allSelected ? 'Tout décocher' : 'Tout cocher'}
                   </button>
                 )}
@@ -125,7 +111,10 @@ export default function ImportRoutineModal({ isOpen, onClose, existingNames = []
                   const isChecked = !empty && !!checked[s.sheetName];
                   return (
                     <button
+                      type="button"
                       key={s.sheetName}
+                      role="checkbox"
+                      aria-checked={isChecked}
                       disabled={empty}
                       onClick={() => !empty && toggle(s.sheetName)}
                       className={`w-full text-left p-3 rounded-xl border transition-all ${
@@ -140,7 +129,7 @@ export default function ImportRoutineModal({ isOpen, onClose, existingNames = []
                         <div className={`w-5 h-5 rounded-md shrink-0 flex items-center justify-center border ${
                           isChecked ? 'bg-blue-500 border-blue-500' : 'border-slate-600 bg-slate-800'
                         }`}>
-                          {isChecked && <Check size={13} className="text-white" />}
+                          {isChecked && <Check size={13} className="text-onaccent" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -172,21 +161,19 @@ export default function ImportRoutineModal({ isOpen, onClose, existingNames = []
               </div>
             </div>
           )}
-        </div>
 
         {/* Footer */}
-        <div className="flex gap-3 p-6 pt-4 border-t border-slate-700/50">
+        <div className="flex gap-3 pt-4 mt-4 border-t border-slate-700/50">
           <Button onClick={onClose} variant="ghost" fullWidth>Annuler</Button>
           <Button
             onClick={handleConfirm}
             variant="success"
             fullWidth
-            className={selectedCount === 0 ? 'opacity-40 cursor-not-allowed' : ''}
+            disabled={selectedCount === 0}
           >
             {selectedCount === 0 ? 'Créer' : `Créer ${selectedCount} programme${selectedCount > 1 ? 's' : ''}`}
           </Button>
         </div>
-      </div>
     </div>
   );
 }

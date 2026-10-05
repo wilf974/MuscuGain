@@ -2,24 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Inter', sans-serif;
-  background-color: #0f172a;
-  color: #e2e8f0;
-  -webkit-tap-highlight-color: transparent;
+:root {
+  color-scheme: dark;
+}
+:root.theme-light {
+  color-scheme: light;
 }
 
-/* Custom Scrollbar */
+html {
+  /* Pas de grossissement auto du texte en paysage sur iOS */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-family: theme('fontFamily.sans');
+  background-color: rgb(var(--c-slate-900));
+  color: rgb(var(--c-slate-200));
+  -webkit-tap-highlight-color: transparent;
+  /* Pas de « rebond » qui révèle le fond derrière l'app en mode standalone */
+  overscroll-behavior-y: none;
+}
+
+/* Verrou de scroll quand une modale est ouverte (cf. ui/Sheet.jsx) */
+html.scroll-locked,
+html.scroll-locked body {
+  overflow: hidden;
+}
+
+/* iOS zoome sur les champs < 16px : on force 16px sur mobile */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Focus clavier visible partout (a11y), sans halo au tap */
+:focus-visible {
+  outline: 2px solid rgb(var(--c-blue-500));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Champs focalisés : rester visibles sous l'en-tête collant et au-dessus du clavier iOS */
+input,
+textarea,
+select {
+  scroll-margin-top: 96px;
+  scroll-margin-bottom: 120px;
+}
+
+@layer utilities {
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .top-safe { top: env(safe-area-inset-top); }
+  .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+  /* Espace bas des vues avec barre d'onglets (64px + encoche) */
+  .pb-nav { padding-bottom: calc(8.5rem + env(safe-area-inset-bottom)); }
+  .bottom-nav { bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  .min-h-screen-safe { min-height: 100vh; min-height: 100dvh; }
+  .max-h-sheet { max-height: 92vh; max-height: calc(100dvh - env(safe-area-inset-top) - 8px); }
+  .touch-manipulation { touch-action: manipulation; }
+  .pb-safe-sheet { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+}
+
+/* Custom Scrollbar (desktop) */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #1e293b; }
-::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 3px; }
+::-webkit-scrollbar-track { background: rgb(var(--c-slate-800)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--c-blue-500)); border-radius: 3px; }
 
 .neon-text { text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+:root.theme-light .neon-text { text-shadow: none; }
 
 .fade-in { animation: fadeIn 0.3s ease-in-out; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.sheet-in { animation: sheetIn 0.25s ease-out; }
+@keyframes sheetIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .video-container {
@@ -44,5 +126,5 @@ body {
   height: 60px;
   object-fit: cover;
   border-radius: 8px;
-  background-color: #1e293b;
+  background-color: rgb(var(--c-slate-800));
 }

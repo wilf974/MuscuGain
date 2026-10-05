@@ -2,15 +2,24 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- viewport-fit=cover : contenu sous l'encoche, compensé par env(safe-area-inset-*). Zoom laissé actif (a11y). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="Suivi de musculation local-first : séances, records, scanner de machine et coach IA.">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="MuscuGain">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="color-scheme" content="dark light">
     <meta name="theme-color" content="#0f172a">
     <title>MuscuGain</title>
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <!-- Thème appliqué avant le 1er rendu (pas de flash) ; fichier externe = compatible CSP sans inline -->
+    <script src="/theme-init.js"></script>
 </head>
 <body>
+    <noscript>MuscuGain a besoin de JavaScript pour fonctionner.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 </body>

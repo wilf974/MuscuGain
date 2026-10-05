@@ -17,6 +17,11 @@ function toDate(input) {
   return new Date(NaN);
 }
 
+// Timestamp (ms) d'une date ISO ou d'un jour 'YYYY-MM-DD' (interprété en LOCAL). NaN si invalide.
+export function toTime(input) {
+  return toDate(input).getTime();
+}
+
 export function isValidDate(input) {
   return Number.isFinite(toDate(input).getTime());
 }

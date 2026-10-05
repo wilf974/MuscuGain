@@ -4,6 +4,7 @@
 //  - normalizeEach=true  : chaque série sur son propre domaine (unités différentes, timeline)
 // markers : dates (ISO) marquées par une ligne verticale pointillée (ex. analyses IA).
 import { chartCoords, seriesDomain } from '../../utils/chart.core';
+import { toTime } from '../../utils/dates.core';
 
 const COLORS = ['#3b82f6', '#f59e0b', '#22c55e', '#ef4444']; // blue-500, amber-500, green-500, red-500
 
@@ -35,12 +36,12 @@ export default function LineChart({ title, series, unit = '', height = 120, norm
   }
 
   // Bornes temporelles globales pour le pied de graphe + markers.
-  const allPts = drawn.flatMap((s) => s.points).map((p) => new Date(p.x).getTime()).filter(Number.isFinite);
+  const allPts = drawn.flatMap((s) => s.points).map((p) => toTime(p.x)).filter(Number.isFinite);
   const t0 = Math.min(...allPts);
   const t1 = Math.max(...allPts);
   const tSpan = t1 - t0 || 1;
   const markerXs = (markers || [])
-    .map((m) => new Date(m).getTime())
+    .map((m) => toTime(m))
     .filter((t) => Number.isFinite(t) && t >= t0 && t <= t1)
     .map((t) => pad + ((t - t0) / tSpan) * (W - pad * 2));
 

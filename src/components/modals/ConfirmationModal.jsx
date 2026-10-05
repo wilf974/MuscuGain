@@ -1,21 +1,15 @@
 import { AlertTriangle } from 'lucide-react';
 import Button from '../ui/Button';
+import Sheet from '../ui/Sheet';
 
-export default function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, confirmLabel = 'Supprimer' }) {
-  if (!isOpen) return null;
+export default function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, confirmLabel = 'Supprimer', cancelLabel = 'Annuler', tone = 'danger' }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in" onClick={onClose}>
-      <div className="bg-slate-800 rounded-2xl w-full max-w-sm border border-slate-700 shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-4 text-red-400">
-          <AlertTriangle size={24} />
-          <h3 className="text-xl font-bold text-white">{title}</h3>
-        </div>
-        <p className="text-slate-300 mb-6 text-sm">{message}</p>
-        <div className="flex gap-3">
-          <Button onClick={onClose} variant="ghost" fullWidth>Annuler</Button>
-          <Button onClick={() => { onConfirm(); onClose(); }} variant="danger" fullWidth>{confirmLabel}</Button>
-        </div>
+    <Sheet isOpen={isOpen} onClose={onClose} title={title} icon={AlertTriangle} iconClass={tone === 'danger' ? 'text-red-400' : 'text-amber-400'} size="sm" z="z-[80]">
+      <p className="text-slate-300 mb-5 text-sm">{message}</p>
+      <div className="flex gap-3">
+        <Button onClick={onClose} variant="ghost" fullWidth>{cancelLabel}</Button>
+        <Button onClick={() => { onConfirm(); onClose(); }} variant={tone === 'danger' ? 'danger' : 'warning'} fullWidth>{confirmLabel}</Button>
       </div>
-    </div>
+    </Sheet>
   );
 }

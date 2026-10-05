@@ -1,10 +1,11 @@
 // src/utils/chart.core.js
 // Math pur des courbes SVG : axe X = temps réel (dates), axe Y = valeur.
 // Renvoie des coordonnées dans le viewBox, pas de DOM ici.
+import { toTime } from './dates.core.js';
 
 function clean(points) {
   return (points || [])
-    .map((p) => ({ t: new Date(p.x).getTime(), y: Number(p.y) }))
+    .map((p) => ({ t: toTime(p.x), y: Number(p.y) }))
     .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.y))
     .sort((a, b) => a.t - b.t);
 }
