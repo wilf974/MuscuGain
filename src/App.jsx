@@ -96,7 +96,7 @@ export default function App() {
 
   // Haut de page à chaque changement d'onglet.
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo(0, 0);
   }, [view]);
 
   // --- Logique ---
