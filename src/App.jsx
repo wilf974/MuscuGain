@@ -42,7 +42,7 @@ const Loading = () => (
 
 export default function App() {
   const showToast = useToast();
-  const playAlarmSound = useAlarm();
+  const { playAlarmSound, unlock: unlockAlarm } = useAlarm();
   const onRestEnd = useCallback(() => {
     playAlarmSound();
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -428,7 +428,7 @@ export default function App() {
             leaveSession={() => setView('dashboard')}
             finishMainWorkout={ws.finishMainWorkout}
             getLastLog={getLastLog}
-            startRestTimer={ws.startRest}
+            startRestTimer={(sec) => { unlockAlarm(); ws.startRest(sec); }}
             addExercise={(name) => ws.addExercise(name, getLastLog(name))}
             openScanner={() => setScannerOpen(true)}
           />
