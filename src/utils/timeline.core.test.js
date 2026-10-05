@@ -15,6 +15,17 @@ test('weeklyVolumePoints groups sessions by ISO week (Monday) and sums volume', 
   ]);
 });
 
+test('weeklyVolumePoints : dimanche soir local reste dans sa semaine', () => {
+  const h = [
+    { date: new Date(2026, 5, 14, 23, 30).toISOString(), totalVolume: 200 }, // dimanche 23:30 local
+    { date: new Date(2026, 5, 15, 0, 15).toISOString(), totalVolume: 100 }, // lundi 00:15 local
+  ];
+  assert.deepEqual(weeklyVolumePoints(h), [
+    { x: '2026-06-08', y: 200 },
+    { x: '2026-06-15', y: 100 },
+  ]);
+});
+
 test('weeklyVolumePoints handles sunday rollover and empty/invalid input', () => {
   const h = [{ date: '2026-06-07T10:00:00.000Z', totalVolume: 300 }]; // dimanche → semaine du 01/06
   assert.deepEqual(weeklyVolumePoints(h), [{ x: '2026-06-01', y: 300 }]);

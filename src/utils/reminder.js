@@ -1,13 +1,15 @@
 // Logique de rappel de séance.
+import { calendarDaysBetween } from './dates.core.js';
+
 // Les fonctions pures (daysSince / shouldRemind) n'utilisent aucun symbole
 // navigateur au niveau module → testables avec `node --test`.
 // Les fonctions IO (Notification) gardent leurs garde-fous à l'intérieur.
 
-// Nombre de jours entiers écoulés depuis `iso` (now injectable pour les tests).
+// Nombre de jours calendaires (locaux) écoulés depuis `iso` (now injectable pour les tests).
 export function daysSince(iso, now = Date.now()) {
-  const then = Date.parse(iso);
-  if (Number.isNaN(then)) return Infinity;
-  return Math.floor((now - then) / (1000 * 60 * 60 * 24));
+  if (Number.isNaN(Date.parse(iso))) return Infinity;
+  const d = calendarDaysBetween(iso, now);
+  return d === null ? Infinity : Math.max(0, d);
 }
 
 // Doit-on rappeler ? Pur, aucune dépendance navigateur.

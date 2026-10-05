@@ -18,6 +18,21 @@ test('buildHistorySummary aggregates per exercise with trend', () => {
   assert.ok(s.muscleVolume.legs > 0);
 });
 
+test('buildHistorySummary : historique stocké récent → ancien, tendance correcte + 30 dernières', () => {
+  const newestFirst = [...H].reverse();
+  const sq = buildHistorySummary(newestFirst, cat).perExercise.find((e) => e.name === 'Squat');
+  assert.equal(sq.trend, 'up');
+  assert.equal(sq.lastWeight, 110);
+  const many = Array.from({ length: 40 }, (_, i) => ({
+    date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+    exercises: { Squat: [{ weight: String(50 + i), reps: '5', done: true }] },
+  })).reverse();
+  const s = buildHistorySummary(many, cat);
+  assert.equal(s.totalSessions, 30);
+  assert.equal(s.perExercise[0].lastWeight, 89); // séance la plus récente
+  assert.ok(s.dateFrom.startsWith('2026-01-11'));
+});
+
 test('buildHistorySummary empty-safe', () => {
   const s = buildHistorySummary([], cat);
   assert.equal(s.totalSessions, 0);

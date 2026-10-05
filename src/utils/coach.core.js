@@ -11,7 +11,13 @@ const roundHalf = (x) => Math.round(x * 2) / 2;
  */
 export function buildHistorySummary(history, categoryOf) {
   const catOf = typeof categoryOf === 'function' ? categoryOf : () => 'other';
-  const sessions = Array.isArray(history) ? history.slice(-30) : [];
+  // L'historique de l'app est stocké du plus récent au plus ancien : on retrie par date
+  // (ancien → récent) puis on garde les 30 DERNIÈRES séances, sinon la tendance serait inversée.
+  const sessions = (Array.isArray(history) ? history.filter(Boolean) : [])
+    .map((s, i) => ({ s, t: Date.parse(s.date), i }))
+    .sort((a, b) => (Number.isFinite(a.t) ? a.t : 0) - (Number.isFinite(b.t) ? b.t : 0) || b.i - a.i)
+    .map((x) => x.s)
+    .slice(-30);
   if (!sessions.length) {
     return { totalSessions: 0, perExercise: [], muscleVolume: {}, weeklyFrequency: 0 };
   }
