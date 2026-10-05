@@ -24,6 +24,9 @@ import MeasurementForm from '../components/MeasurementForm';
 import { analyzeBody, AnalyzeBodyError } from '../utils/analyzeBody';
 import { toPoints } from '../utils/measurements.core';
 import { weeklyVolumePoints } from '../utils/timeline.core';
+import { toTime } from '../utils/dates.core';
+import IconButton from '../components/ui/IconButton';
+import useOnlineStatus from '../hooks/useOnlineStatus';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,7 +40,7 @@ function formatDateFR(iso) {
 }
 
 function formatDateShortFR(iso) {
-  return new Date(iso).toLocaleDateString('fr-FR', {
+  return new Date(toTime(iso)).toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -175,21 +178,23 @@ function ResultsCards({ entry }) {
 
 // ─── CaptureButtons ───────────────────────────────────────────────────────────
 
-function CaptureButtons({ triggerCapture }) {
+function CaptureButtons({ triggerCapture, disabled }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <button
         type="button"
+        disabled={disabled}
         onClick={() => triggerCapture('camera')}
-        className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-blue-300 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-colors active:scale-95"
+        className="min-h-11 disabled:opacity-40 flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-blue-300 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 transition-colors active:scale-95"
       >
         <Camera size={20} />
         <span className="text-sm">Prendre une photo</span>
       </button>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => triggerCapture('gallery')}
-        className="flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-slate-300 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 transition-colors active:scale-95"
+        className="min-h-11 disabled:opacity-40 flex items-center justify-center gap-2 px-4 py-4 rounded-xl font-bold text-slate-300 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 transition-colors active:scale-95"
       >
         <ImageIcon size={20} />
         <span className="text-sm">Galerie</span>
@@ -217,8 +222,9 @@ function Timeline({ bodyAnalyses }) {
           <Card key={entry.date}>
             <button
               type="button"
+              aria-expanded={isOpen}
               onClick={() => setExpandedDate(isOpen ? null : entry.date)}
-              className="w-full text-left"
+              className="w-full min-h-11 text-left"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -320,13 +326,15 @@ function MeasurementsSection({ measurements, addMeasurement, requestDeleteMeasur
       {weightPts.length >= 2 && <LineChart title="Poids" unit="kg" series={[{ label: 'Poids', points: weightPts }]} />}
       {measurements.some((m) => m.arms || m.waist || m.thighs) && (
         <div className="space-y-2">
-          <div className="flex gap-2">
+          <div className="flex gap-2" role="radiogroup" aria-label="Mensuration affichée">
             {MEASURE_OPTIONS.map((o) => (
               <button
                 key={o.key}
                 type="button"
+                role="radio"
+                aria-checked={measureKey === o.key}
                 onClick={() => setMeasureKey(o.key)}
-                className={`px-3 py-1 rounded-lg text-xs transition-colors ${measureKey === o.key ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                className={`min-h-11 px-4 rounded-xl text-xs transition-colors ${measureKey === o.key ? 'bg-blue-600 text-onaccent' : 'bg-slate-800 text-slate-400'}`}
               >
                 {o.label}
               </button>
@@ -344,13 +352,13 @@ function MeasurementsSection({ measurements, addMeasurement, requestDeleteMeasur
           <h3 className="text-sm font-semibold text-white">Dernières mesures</h3>
           {recent.map((m) => (
             <div key={m.date} className="flex items-center justify-between text-xs text-slate-300">
-              <span>{new Date(m.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <span>{new Date(toTime(m.date)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               <span className="font-mono">
                 {m.weight} kg{m.arms ? ` · bras ${m.arms}` : ''}{m.waist ? ` · taille ${m.waist}` : ''}{m.thighs ? ` · cuisses ${m.thighs}` : ''}
               </span>
-              <button type="button" onClick={() => requestDeleteMeasurement(m.date)} className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors" aria-label="Supprimer la mesure">
-                <Trash2 size={13} />
-              </button>
+              <IconButton label={`Supprimer la mesure du ${m.date}`} tone="danger" onClick={() => requestDeleteMeasurement(m.date)}>
+                <Trash2 size={15} />
+              </IconButton>
             </div>
           ))}
         </div>
@@ -362,6 +370,7 @@ function MeasurementsSection({ measurements, addMeasurement, requestDeleteMeasur
 // ─── Main view ────────────────────────────────────────────────────────────────
 
 export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measurements, addMeasurement, requestDeleteMeasurement, history }) {
+  const online = useOnlineStatus();
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
@@ -397,10 +406,11 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measuremen
     if (status !== 'consent' || !pendingSource) return;
     localStorage.setItem('muscuGainBodyConsent', '1');
     const src = pendingSource;
+    // Ouverture SYNCHRONE dans le geste utilisateur : iOS Safari bloque un click() différé
+    // (setTimeout) sur un input file. Les inputs sont toujours montés.
+    openPicker(src);
     setPendingSource(null);
     setStatus('idle');
-    // Defer one tick so the input is accessible after re-render
-    setTimeout(() => openPicker(src), 0);
   };
 
   const handleConsentCancel = () => {
@@ -435,7 +445,7 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measuremen
   };
 
   return (
-    <div className="space-y-6 pb-24 fade-in">
+    <div className="space-y-6 pb-nav fade-in">
       {/* Hidden file inputs */}
       <input
         ref={cameraInputRef}
@@ -471,7 +481,8 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measuremen
 
       {/* ── LOADING ── */}
       {status === 'loading' && (
-        <Card className="py-12 flex flex-col items-center gap-4">
+        <Card className="py-12 flex flex-col items-center gap-4" >
+          <span className="sr-only" role="status">Analyse en cours</span>
           <Loader2 size={40} className="text-blue-400 animate-spin" />
           <p className="text-slate-300 font-semibold">Analyse en cours…</p>
           <p className="text-xs text-slate-500">Cela peut prendre jusqu'à 30 secondes.</p>
@@ -502,7 +513,7 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measuremen
             <button
               type="button"
               onClick={goIdle}
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 transition-colors"
+              className="min-h-11 px-2 text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 transition-colors"
             >
               <RefreshCw size={13} />
               Nouvelle analyse
@@ -530,7 +541,9 @@ export default function BodyAnalysis({ bodyAnalyses, addBodyAnalysis, measuremen
                 </p>
               </div>
             </div>
-            <CaptureButtons triggerCapture={triggerCapture} />
+            <CaptureButtons triggerCapture={triggerCapture} disabled={!online} />
+            {!online && <p role="status" className="text-xs text-amber-300 mt-2">Hors ligne : l’analyse IA reviendra avec la connexion. Tes mesures restent disponibles.</p>}
+            <p className="text-xs text-slate-500 mt-3">La photo est envoyée à l’IA pour l’analyse puis oubliée : seul le résultat texte est gardé sur ton téléphone.</p>
           </Card>
 
           {/* Mes mesures */}

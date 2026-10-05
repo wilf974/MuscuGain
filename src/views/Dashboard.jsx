@@ -1,25 +1,40 @@
 import { useMemo, useState } from 'react';
-import { Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Pencil, Copy, Sparkles, Loader2, TrendingUp, AlertTriangle, BarChart3, Scale, BatteryLow, UserCog, Bell } from 'lucide-react';
+import {
+  Dumbbell, Activity, Plus, Play, User, Trash2, Upload, Pencil, Copy, Sparkles, Loader2, TrendingUp, TrendingDown,
+  AlertTriangle, BarChart3, Scale, BatteryLow, UserCog, ScanLine, Settings, RotateCcw, Flame, CalendarCheck, Lightbulb,
+} from 'lucide-react';
 import Button from '../components/ui/Button';
+import IconButton from '../components/ui/IconButton';
 import Card from '../components/ui/Card';
 import { DEFAULT_ROUTINES } from '../data/routines';
 import { categoryOf } from '../data/exercises';
 import { buildHistorySummary } from '../utils/coach.core';
 import { fetchCoachAnalysis, CoachError } from '../utils/coach';
-import { useToast } from '../components/ui/Toast';
-import { requestReminderPermission } from '../utils/reminder';
+import { weekSummary, nextRoutine } from '../utils/stats.core';
+import { localDateKey, relativeDayLabel } from '../utils/dates.core';
+import { formatTime } from '../utils/format';
+import useOnlineStatus from '../hooks/useOnlineStatus';
+import useNow from '../hooks/useNow';
+
+const fmtVolume = (v) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(v)));
+
+const TIPS = ['Vise 8 à 12 répétitions pour l’hypertrophie.', 'Pense à une semaine plus légère toutes les 6–8 semaines.', 'Dors 7 à 9 h : c’est là que tu progresses.', 'Environ 1,6–2 g de protéines par kg de poids de corps.', 'Contrôle la descente : 2–3 secondes.'];
 
 export default function Dashboard({
   history,
   customRoutines,
   activeRoutine,
+  sessionPhase,
+  sessionDuration,
   lastFinishedSession,
-  setView,
+  resumable,
   triggerSetup,
   startFreeSession,
+  openSession,
+  openScanner,
+  openSettings,
   requestDeleteRoutine,
   resumeLastSession,
-  canResumeSession,
   onImportClick,
   onGenerateClick,
   onCreateClick,
@@ -29,28 +44,16 @@ export default function Dashboard({
   onCoachAnalyzed,
   bodyAnalyses = [],
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const online = useOnlineStatus();
+  const now = useNow(60_000);
+  const today = localDateKey(now);
   const cachedToday = coachAnalysis && coachAnalysis.date === today ? coachAnalysis.data : null;
   const [coachStatus, setCoachStatus] = useState('idle'); // idle | loading | error
   const [coachError, setCoachError] = useState('');
 
-  const showToast = useToast();
-  const [remindersOn, setRemindersOn] = useState(
-    typeof localStorage !== 'undefined' && localStorage.getItem('muscuGainReminders') === '1'
-  );
-
-  const enableReminders = async () => {
-    const result = await requestReminderPermission();
-    if (result === 'granted') {
-      localStorage.setItem('muscuGainReminders', '1');
-      setRemindersOn(true);
-      showToast('Rappels activés');
-    } else if (result === 'denied') {
-      showToast('Notifications refusées', 'info');
-    } else {
-      showToast('Notifications non supportées', 'info');
-    }
-  };
+  const week = useMemo(() => weekSummary(history, new Date(now)), [history, now]);
+  const allRoutines = useMemo(() => [...customRoutines, ...DEFAULT_ROUTINES], [customRoutines]);
+  const suggestion = useMemo(() => nextRoutine(allRoutines, history), [allRoutines, history]);
 
   const runCoachAnalysis = async () => {
     setCoachStatus('loading');
@@ -66,281 +69,237 @@ export default function Dashboard({
     }
   };
 
-  const coachAdvice = useMemo(() => {
-    if (history.length === 0) {
-      return { type: 'info', title: 'Bienvenue !', text: "Complétez votre première séance pour débloquer l'analyse du coach.", icon: 'star' };
+  // Conseil « règle » (sans IA, hors ligne) basé sur le rythme et le volume récents.
+  const tip = useMemo(() => {
+    if (!history.length) return null;
+    if (week.daysSinceLast !== null && week.daysSinceLast > 7) {
+      return { tone: 'warning', icon: AlertTriangle, title: 'On reprend ?', text: 'Plus d’une semaine sans séance : une séance légère suffit pour relancer la machine.' };
     }
-    const lastSession = history[0];
-    const daysSinceLast = Math.floor((Date.now() - new Date(lastSession.date).getTime()) / (1000 * 60 * 60 * 24));
-    if (daysSinceLast > 7) {
-      return { type: 'warning', title: 'Attention au rythme', text: "Cela fait plus d'une semaine. La régularité est la clé.", icon: 'alert-triangle' };
+    const [last, ...rest] = history;
+    const prevSame = rest.find((h) => h.routineName === last.routineName);
+    if (prevSame) {
+      const diff = last.totalVolume - prevSame.totalVolume;
+      if (diff > 50) return { tone: 'success', icon: TrendingUp, title: 'Belle progression', text: `+${Math.round(diff)} kg de volume sur « ${last.routineName} » par rapport à la fois précédente.` };
+      if (diff < -50) return { tone: 'neutral', icon: Activity, title: 'Volume en baisse', text: 'Normal de temps en temps : vérifie sommeil et récupération.' };
     }
-    const previousSameRoutine = history.slice(1).find((h) => h.routineName === lastSession.routineName);
-    if (previousSameRoutine) {
-      const volDiff = lastSession.totalVolume - previousSameRoutine.totalVolume;
-      if (volDiff > 50) return { type: 'success', title: 'Excellente progression !', text: `Volume augmenté de ${Math.round(volDiff)}kg. Continuez !`, icon: 'trending-up' };
-      else if (volDiff < -50) return { type: 'neutral', title: 'Volume en baisse', text: 'Volume en baisse. Assurez-vous de bien récupérer.', icon: 'activity' };
-    }
-    const tips = ['Visez 8-12 répétitions.', 'Pensez à la semaine de décharge.', 'Dormez 7-9h.', 'Mangez ~1.8g de protéines/kg.', 'Contrôlez la descente.'];
-    return { type: 'info', title: 'Conseil du Coach', text: tips[history.length % tips.length], icon: 'lightbulb' };
-  }, [history]);
+    return { tone: 'info', icon: Lightbulb, title: 'Conseil du coach', text: TIPS[history.length % TIPS.length] };
+  }, [history, week.daysSinceLast]);
 
-  const coachColors = {
-    success: { bg: 'bg-green-900/20 border-green-500/30', badge: 'bg-green-500/20 text-green-400', text: 'text-green-400' },
-    warning: { bg: 'bg-orange-900/20 border-orange-500/30', badge: 'bg-orange-500/20 text-orange-400', text: 'text-orange-400' },
-    info: { bg: 'bg-blue-900/20 border-blue-500/30', badge: 'bg-blue-500/20 text-blue-400', text: 'text-blue-400' },
-    neutral: { bg: 'bg-blue-900/20 border-blue-500/30', badge: 'bg-blue-500/20 text-blue-400', text: 'text-blue-400' },
+  const toneClasses = {
+    success: 'bg-green-500/10 border-green-500/30 text-green-400',
+    warning: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+    info: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+    neutral: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
   };
-  const colors = coachColors[coachAdvice.type] || coachColors.info;
 
-  // Map icon names to lucide-react components dynamically
-  const iconMap = {
-    star: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-    'alert-triangle': () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>,
-    'trending-up': () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
-    activity: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
-    lightbulb: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
-  };
-  const CoachIcon = iconMap[coachAdvice.icon] || iconMap.lightbulb;
+  const dateLabel = new Date(now).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const lastLabel = week.lastSession ? relativeDayLabel(week.lastSession.date, new Date(now)) : null;
 
   return (
-    <div className="space-y-6 pb-24 fade-in">
-      <header className="flex justify-between items-center mb-6">
+    <div className="space-y-5 pb-nav fade-in">
+      <header className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-white neon-text">MuscuGain</h1>
-          <p className="text-slate-400 text-sm">Mode Local &bull; Privé</p>
+          <p className="text-slate-400 text-sm first-letter:uppercase">{dateLabel}</p>
         </div>
-        <div className="bg-slate-800 p-2 rounded-full">
-          <Dumbbell className="text-blue-500" size={20} />
-        </div>
+        <IconButton label="Réglages" onClick={openSettings}>
+          <Settings size={22} />
+        </IconButton>
       </header>
 
-      {/* Coach */}
-      <div className={`p-4 rounded-xl border flex items-start gap-4 shadow-lg ${colors.bg}`}>
-        <div className={`p-2 rounded-full ${colors.badge}`}><CoachIcon /></div>
-        <div>
-          <h3 className={`font-bold ${colors.text}`}>{coachAdvice.title}</h3>
-          <p className="text-sm text-slate-300 mt-1">{coachAdvice.text}</p>
-        </div>
-      </div>
+      {/* ── Prochaine action ── */}
+      {activeRoutine ? (
+        <section aria-label="Séance en cours" className="rounded-2xl p-5 bg-green-600/15 border border-green-500/40">
+          <p className="text-xs font-bold uppercase tracking-wider text-green-400">Séance en cours</p>
+          <h2 className="text-xl font-bold text-white mt-1 truncate">{activeRoutine.name}</h2>
+          <p className="text-sm text-slate-300 mt-1">
+            {sessionPhase === 'workout' ? <>Chrono <span className="font-mono tabular-nums">{formatTime(sessionDuration)}</span></> : sessionPhase === 'cooldown' ? 'Récupération : pense à enregistrer.' : 'Pas encore commencée.'}
+          </p>
+          <div className="grid grid-cols-[1fr_auto] gap-3 mt-4">
+            <Button variant="success" onClick={openSession}><Play size={18} aria-hidden="true" /> Reprendre</Button>
+            <Button variant="soft" onClick={openScanner} aria-label="Scanner une machine"><ScanLine size={20} aria-hidden="true" /></Button>
+          </div>
+        </section>
+      ) : (
+        <section aria-label="Prochaine séance" className="rounded-2xl p-5 bg-blue-600/15 border border-blue-500/40">
+          {suggestion && history.length > 0 ? (
+            <>
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-400">Prochaine séance suggérée</p>
+              <h2 className="text-xl font-bold text-white mt-1 truncate">{suggestion.routine.name}</h2>
+              <p className="text-sm text-slate-300 mt-1">
+                {suggestion.routine.exercises.length} exercices · {suggestion.lastDone ? `dernière fois ${relativeDayLabel(suggestion.lastDone, new Date(now))}` : 'jamais faite'}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-400">Pour commencer</p>
+              <h2 className="text-xl font-bold text-white mt-1">Ta première séance</h2>
+              <p className="text-sm text-slate-300 mt-1">Lance un programme d’exemple, ou une séance libre en scannant les machines au fil de l’eau.</p>
+            </>
+          )}
+          <Button fullWidth className="mt-4" onClick={() => triggerSetup(suggestion ? suggestion.routine : allRoutines[0])}>
+            <Play size={18} aria-hidden="true" /> Commencer
+          </Button>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <Button variant="secondary" onClick={startFreeSession}><Dumbbell size={18} aria-hidden="true" /> Séance libre</Button>
+            <Button variant="soft" onClick={openScanner}><ScanLine size={18} aria-hidden="true" /> Scanner</Button>
+          </div>
+        </section>
+      )}
 
-      {/* Coach IA — bilan de l'historique */}
+      {resumable && lastFinishedSession && (
+        <section aria-label="Séance à reprendre" className="rounded-2xl p-4 bg-amber-500/10 border border-amber-500/40 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-amber-400 font-bold text-sm">Oublié une série ?</h3>
+            <p className="text-xs text-slate-300 truncate">Rouvre « {lastFinishedSession.activeRoutine?.name} » (terminée il y a moins de 2 h).</p>
+          </div>
+          <Button variant="warning" onClick={resumeLastSession} className="shrink-0 text-sm"><RotateCcw size={16} aria-hidden="true" /> Reprendre</Button>
+        </section>
+      )}
+
+      {/* ── Semaine ── */}
+      <section aria-label="Cette semaine" className="grid grid-cols-3 gap-3">
+        <Card className="flex flex-col items-center justify-center py-4 px-2 text-center">
+          <CalendarCheck size={18} className="text-blue-400 mb-1" aria-hidden="true" />
+          <span className="text-2xl font-bold text-white tabular-nums">{week.thisWeek.sessions}</span>
+          <span className="text-[11px] text-slate-400 leading-tight">séance{week.thisWeek.sessions > 1 ? 's' : ''} cette semaine</span>
+        </Card>
+        <Card className="flex flex-col items-center justify-center py-4 px-2 text-center">
+          {week.volumeTrendPct !== null && week.volumeTrendPct < 0
+            ? <TrendingDown size={18} className="text-amber-400 mb-1" aria-hidden="true" />
+            : <TrendingUp size={18} className="text-green-400 mb-1" aria-hidden="true" />}
+          <span className="text-2xl font-bold text-white tabular-nums">{fmtVolume(week.thisWeek.volume)}</span>
+          <span className="text-[11px] text-slate-400 leading-tight">
+            kg soulevés{week.volumeTrendPct !== null && <> · <span className={week.volumeTrendPct < 0 ? 'text-amber-400' : 'text-green-400'}>{week.volumeTrendPct > 0 ? '+' : ''}{week.volumeTrendPct} %</span></>}
+          </span>
+        </Card>
+        <Card className="flex flex-col items-center justify-center py-4 px-2 text-center">
+          <Flame size={18} className="text-orange-400 mb-1" aria-hidden="true" />
+          <span className="text-2xl font-bold text-white tabular-nums">{week.weekStreak}</span>
+          <span className="text-[11px] text-slate-400 leading-tight">sem. d’affilée</span>
+        </Card>
+      </section>
+      {lastLabel && (
+        <p className="text-xs text-slate-500 -mt-2 text-center">
+          Dernière séance {lastLabel} · {history.length} au total
+        </p>
+      )}
+
+      {tip && (
+        <div className={`p-4 rounded-2xl border flex items-start gap-3 ${toneClasses[tip.tone]}`}>
+          <tip.icon size={20} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <h3 className="font-bold text-sm">{tip.title}</h3>
+            <p className="text-sm text-slate-300 mt-0.5">{tip.text}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Coach IA — bilan de l'historique ── */}
       {history.length > 0 && (
-        <Card className="border-blue-500/30 bg-blue-900/10 fade-in">
+        <Card className="border-blue-500/30 bg-blue-900/10">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-full bg-blue-500/20 text-blue-400"><Sparkles size={18} /></div>
-              <h3 className="font-bold text-white">Coach IA</h3>
+              <div className="p-2 rounded-full bg-blue-500/20 text-blue-400"><Sparkles size={18} aria-hidden="true" /></div>
+              <h2 className="font-bold text-white">Coach IA</h2>
             </div>
-            {cachedToday && coachStatus !== 'loading' && (
-              <button
-                onClick={runCoachAnalysis}
-                className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
-              >
-                <Sparkles size={13} /> Rafraîchir
+            {cachedToday && coachStatus !== 'loading' && online && (
+              <button type="button" onClick={runCoachAnalysis} className="min-h-11 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-3 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors">
+                <Sparkles size={13} aria-hidden="true" /> Rafraîchir
               </button>
             )}
           </div>
 
           {coachStatus === 'loading' && (
-            <div className="flex items-center gap-2 text-slate-300 text-sm py-4 justify-center">
-              <Loader2 size={18} className="animate-spin text-blue-400" /> Analyse en cours…
+            <div role="status" className="flex items-center gap-2 text-slate-300 text-sm py-4 justify-center">
+              <Loader2 size={18} className="animate-spin text-blue-400" aria-hidden="true" /> Analyse en cours…
             </div>
           )}
 
           {coachStatus === 'error' && (
-            <div className="space-y-3">
+            <div role="alert" className="space-y-3">
               <p className="text-sm text-amber-400">{coachError}</p>
-              <Button onClick={runCoachAnalysis} className="py-2 text-sm">
-                <Sparkles size={15} /> Réessayer
-              </Button>
+              <Button onClick={runCoachAnalysis} disabled={!online} className="text-sm"><Sparkles size={15} aria-hidden="true" /> Réessayer</Button>
             </div>
           )}
 
-          {coachStatus !== 'loading' && coachStatus !== 'error' && !cachedToday && (
+          {coachStatus === 'idle' && !cachedToday && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-300">
-                Obtiens un bilan personnalisé de ta progression à partir de ton historique.
-              </p>
-              <Button onClick={runCoachAnalysis} fullWidth className="py-2.5 text-sm">
-                <Sparkles size={16} /> Demander un bilan
+              <p className="text-sm text-slate-300">Un bilan personnalisé de ta progression à partir de ton historique (résumé chiffré, rien d’autre).</p>
+              <Button onClick={runCoachAnalysis} fullWidth disabled={!online} className="text-sm">
+                <Sparkles size={16} aria-hidden="true" /> {online ? 'Demander un bilan' : 'Disponible en ligne'}
               </Button>
             </div>
           )}
 
-          {coachStatus !== 'loading' && coachStatus !== 'error' && cachedToday && (
+          {coachStatus === 'idle' && cachedToday && (
             <div className="space-y-4 fade-in">
-              {cachedToday.overview && (
-                <p className="text-sm text-slate-200 leading-relaxed">{cachedToday.overview}</p>
-              )}
-
+              {cachedToday.overview && <p className="text-sm text-slate-200 leading-relaxed">{cachedToday.overview}</p>}
               {cachedToday.progression.length > 0 && (
                 <CoachSection icon={TrendingUp} iconColor="text-green-400" title="Progression">
-                  <ul className="space-y-1 mt-2">
-                    {cachedToday.progression.map((t, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-green-300">
-                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-green-400" />
-                        <span>{t}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <BulletList items={cachedToday.progression} dot="bg-green-400" text="text-green-300" />
                 </CoachSection>
               )}
-
               {cachedToday.plateaus.length > 0 && (
                 <CoachSection icon={AlertTriangle} iconColor="text-amber-400" title="Plateaux">
-                  <ul className="space-y-1 mt-2">
-                    {cachedToday.plateaus.map((t, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-amber-300">
-                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
-                        <span>{t}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <BulletList items={cachedToday.plateaus} dot="bg-amber-400" text="text-amber-300" />
                 </CoachSection>
               )}
-
-              {cachedToday.weeklyVolume && (
-                <CoachSection icon={BarChart3} iconColor="text-blue-400" title="Volume hebdo">
-                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.weeklyVolume}</p>
-                </CoachSection>
-              )}
-
-              {cachedToday.balance && (
-                <CoachSection icon={Scale} iconColor="text-blue-400" title="Équilibre">
-                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.balance}</p>
-                </CoachSection>
-              )}
-
-              {cachedToday.deload && (
-                <CoachSection icon={BatteryLow} iconColor="text-amber-400" title="Deload">
-                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.deload}</p>
-                </CoachSection>
-              )}
-
-              {cachedToday.bodyCross && (
-                <CoachSection icon={UserCog} iconColor="text-blue-400" title="Corps × training">
-                  <p className="text-sm text-slate-200 mt-1 leading-relaxed">{cachedToday.bodyCross}</p>
-                </CoachSection>
-              )}
+              {cachedToday.weeklyVolume && <CoachText icon={BarChart3} title="Volume hebdo" text={cachedToday.weeklyVolume} />}
+              {cachedToday.balance && <CoachText icon={Scale} title="Équilibre" text={cachedToday.balance} />}
+              {cachedToday.deload && <CoachText icon={BatteryLow} iconColor="text-amber-400" title="Deload" text={cachedToday.deload} />}
+              {cachedToday.bodyCross && <CoachText icon={UserCog} title="Corps × training" text={cachedToday.bodyCross} />}
             </div>
           )}
         </Card>
       )}
 
-      {/* Active session */}
-      {activeRoutine && (
-        <div className="bg-blue-600/20 border border-blue-500/50 rounded-xl p-4 mb-6 flex justify-between items-center animate-pulse-soft">
-          <div>
-            <h3 className="text-blue-400 font-bold">Séance en cours</h3>
-            <p className="text-xs text-blue-200">{activeRoutine.name}</p>
-          </div>
-          <Button onClick={() => setView('workout')} className="py-2 text-xs">Reprendre</Button>
+      {/* ── Programmes ── */}
+      <section aria-labelledby="programs-title" className="pt-2">
+        <h2 id="programs-title" className="text-lg font-semibold text-white mb-3">Programmes</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <Button variant="soft" onClick={onGenerateClick} disabled={!online} className="text-xs px-2"><Sparkles size={16} aria-hidden="true" /> IA</Button>
+          <Button variant="secondary" onClick={onImportClick} className="text-xs px-2"><Upload size={16} aria-hidden="true" /> Importer</Button>
+          <Button variant="soft" onClick={onCreateClick} className="text-xs px-2"><Plus size={16} aria-hidden="true" /> Créer</Button>
         </div>
-      )}
-
-      {/* Resume session */}
-      {!activeRoutine && canResumeSession() && (
-        <div className="bg-amber-600/20 border border-amber-500/50 rounded-xl p-4 mb-6 flex justify-between items-center animate-pulse-soft">
-          <div>
-            <h3 className="text-amber-400 font-bold">Séance à reprendre</h3>
-            <p className="text-xs text-amber-200">{lastFinishedSession?.activeRoutine?.name}</p>
-          </div>
-          <Button onClick={resumeLastSession} className="py-2 text-xs bg-amber-600 hover:bg-amber-500">Reprendre</Button>
-        </div>
-      )}
-
-      {/* Séance libre */}
-      {!activeRoutine && (
-        <Button fullWidth onClick={startFreeSession} className="bg-blue-600 hover:bg-blue-500 shadow-blue-900/50">
-          <Play size={16} /> Séance libre
-        </Button>
-      )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="flex flex-col items-center justify-center py-6">
-          <span className="text-3xl font-bold text-blue-400">{history.length}</span>
-          <span className="text-xs text-slate-400 uppercase tracking-wide mt-1">Séances</span>
-        </Card>
-        <Card className="flex flex-col items-center justify-center py-6">
-          <span className="text-3xl font-bold text-green-400">
-            {history.length > 0 ? Math.round(history.reduce((acc, curr) => acc + curr.totalVolume, 0) / 1000) + 'k' : '0'}
-          </span>
-          <span className="text-xs text-slate-400 uppercase tracking-wide mt-1">Volume (kg)</span>
-        </Card>
-      </div>
-
-      {/* Activer les rappels (opt-in) */}
-      {!remindersOn && (
-        <button
-          type="button"
-          onClick={enableReminders}
-          className="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-300 px-4 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-slate-700"
-        >
-          <Bell size={16} className="text-blue-400" /> 🔔 Activer les rappels
-        </button>
-      )}
-
-      {/* Programmes */}
-      <div className="mt-8 mb-4">
-        <h2 className="text-lg font-semibold text-white mb-3">Programmes</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={onGenerateClick} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-500/30">
-            <Sparkles size={14} /> Générer par IA
-          </button>
-          <button onClick={onImportClick} className="bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-slate-600">
-            <Upload size={14} /> Importer
-          </button>
-          <button onClick={onCreateClick} className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors border border-blue-500/30">
-            <Plus size={14} /> Créer
-          </button>
-        </div>
-      </div>
+      </section>
 
       <div className="space-y-4">
         {customRoutines.length > 0 && (
-          <div className="space-y-4 mb-6">
-            <div className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Mes Programmes</div>
+          <div className="space-y-3">
+            <h3 className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Mes programmes</h3>
             {customRoutines.map((routine) => (
-              <Card key={routine.id} className="relative overflow-hidden group border-blue-500/30 bg-slate-800/80">
-                <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-400 pointer-events-none"><User size={60} /></div>
-                <div className="relative z-10 flex justify-between items-start mb-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xl font-bold text-white truncate min-w-0">{routine.name}</h3>
-                      <button type="button" onClick={() => onEditRoutine(routine)} className="shrink-0 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
-                        <Pencil size={14} />
-                      </button>
-                      <button type="button" onClick={() => onDuplicateRoutine(routine)} className="shrink-0 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 p-1 rounded transition-colors">
-                        <Copy size={14} />
-                      </button>
-                      <button type="button" onClick={() => requestDeleteRoutine(routine.id)} className="shrink-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+              <Card key={routine.id} className="relative overflow-hidden border-blue-500/30 bg-slate-800/80">
+                <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-400 pointer-events-none" aria-hidden="true"><User size={60} /></div>
+                <div className="relative z-10 flex items-start gap-1">
+                  <div className="flex-1 min-w-0 pt-2">
+                    <h4 className="text-lg font-bold text-white truncate">{routine.name}</h4>
+                    <p className="text-slate-400 text-sm">{routine.exercises.length} exercices · {routine.desc || 'Personnalisé'}</p>
                   </div>
+                  <IconButton label={`Modifier ${routine.name}`} tone="blue" onClick={() => onEditRoutine(routine)}><Pencil size={17} /></IconButton>
+                  <IconButton label={`Dupliquer ${routine.name}`} tone="blue" onClick={() => onDuplicateRoutine(routine)}><Copy size={17} /></IconButton>
+                  <IconButton label={`Supprimer ${routine.name}`} tone="danger" onClick={() => requestDeleteRoutine(routine.id)}><Trash2 size={17} /></IconButton>
                 </div>
-                <p className="text-slate-400 text-sm mb-4 line-clamp-1">{routine.exercises.length} exercices &bull; Personnalisé</p>
-                <Button fullWidth onClick={() => triggerSetup(routine)} className="bg-slate-700 hover:bg-blue-600 transition-colors">
-                  Commencer <Play size={16} />
+                <Button fullWidth variant="secondary" onClick={() => triggerSetup(routine)} className="mt-3 relative z-10" disabled={!!activeRoutine}>
+                  Commencer <Play size={16} aria-hidden="true" />
                 </Button>
               </Card>
             ))}
           </div>
         )}
 
-        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Exemples</div>
+        <h3 className="text-xs text-slate-500 font-bold uppercase tracking-wider ml-1">Exemples</h3>
         {DEFAULT_ROUTINES.map((routine) => (
-          <Card key={routine.id} className="relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Activity size={60} /></div>
-            <h3 className="text-xl font-bold text-white">{routine.name}</h3>
-            <p className="text-slate-400 text-sm mb-4 line-clamp-1">{routine.desc}</p>
-            <Button fullWidth onClick={() => triggerSetup(routine)}>
-              Commencer <Play size={16} />
+          <Card key={routine.id} className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none" aria-hidden="true"><Activity size={60} /></div>
+            <h4 className="text-lg font-bold text-white">{routine.name}</h4>
+            <p className="text-slate-400 text-sm mb-3 line-clamp-2">{routine.desc}</p>
+            <Button fullWidth onClick={() => triggerSetup(routine)} disabled={!!activeRoutine}>
+              Commencer <Play size={16} aria-hidden="true" />
             </Button>
           </Card>
         ))}
+        {activeRoutine && <p className="text-xs text-slate-500 text-center">Termine ou annule la séance en cours pour en démarrer une autre.</p>}
       </div>
     </div>
   );
@@ -350,10 +309,31 @@ function CoachSection({ icon: Icon, iconColor, title, children }) {
   return (
     <div>
       <div className="flex items-center gap-2">
-        <Icon size={15} className={iconColor} />
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{title}</span>
+        <Icon size={15} className={iconColor} aria-hidden="true" />
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">{title}</h3>
       </div>
       {children}
     </div>
+  );
+}
+
+function CoachText({ icon, iconColor = 'text-blue-400', title, text }) {
+  return (
+    <CoachSection icon={icon} iconColor={iconColor} title={title}>
+      <p className="text-sm text-slate-200 mt-1 leading-relaxed">{text}</p>
+    </CoachSection>
+  );
+}
+
+function BulletList({ items, dot, text }) {
+  return (
+    <ul className="space-y-1 mt-2">
+      {items.map((t, i) => (
+        <li key={i} className={`flex items-start gap-2 text-sm ${text}`}>
+          <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} aria-hidden="true" />
+          <span>{t}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
