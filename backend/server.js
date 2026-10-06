@@ -7,7 +7,7 @@ import {
 } from './lib.js';
 
 const API_KEY = process.env.NVIDIA_API_KEY;
-const MODEL = process.env.NVIDIA_MODEL || 'nvidia/nemotron-nano-12b-v2-vl';
+const MODEL = process.env.NVIDIA_MODEL || 'meta/llama-3.2-11b-vision-instruct';
 const PORT = Number(process.env.PORT) || 8000;
 const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 // Timeout appel modèle : < proxy_read_timeout nginx (90s) et < attente côté front.
