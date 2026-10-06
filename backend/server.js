@@ -112,7 +112,7 @@ app.post('/recognize-exercise', { config: { rateLimit: IMAGE_RATE } }, async (re
     "Donne les 3 exercices les plus probables, du plus au moins probable. " +
     "Garde-fou: si la photo ne montre pas clairement une vraie machine ou un équipement de musculation (ex. logo, icône, dessin, objet ambigu), retourne isGymEquipment=false, label=null et candidates=[]. Ne déduis JAMAIS un exercice uniquement depuis la liste autorisée. Sinon retourne isGymEquipment=true. " +
     "Réponds UNIQUEMENT en JSON, sans texte autour: " +
-    '{"label":"<texte lu sur la machine, ou null>","candidates":[{"exercise":"<nom>","confidence":<0 à 1>,"muscleGroup":"<chest|back|legs|shoulders|arms|abs>","inList":<true si nom exact de la liste, sinon false>}]}.' +
+    '{"isGymEquipment":<true|false>,"label":"<texte lu sur la machine, ou null>","candidates":[{"exercise":"<nom>","confidence":<0 à 1>,"muscleGroup":"<chest|back|legs|shoulders|arms|abs>","inList":<true si nom exact de la liste, sinon false>}]}.' +
     listText;
 
   const r = await callModel({
