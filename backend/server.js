@@ -98,6 +98,28 @@ app.post('/recognize-exercise', { config: { rateLimit: IMAGE_RATE } }, async (re
   if (!img.ok) return reply.code(img.status).send({ error: img.error });
   if (!API_KEY) return noKey(reply);
 
+  // Gate visuel : le scanner n'accepte qu'une vraie photo de matériel physique,
+  // jamais une icône, un logo, un dessin ou une capture d'écran.
+  const gatePrompt =
+    "Classifie cette image. isRealGymPhoto=true UNIQUEMENT si c'est une vraie photographie " +
+    "d'une machine ou d'un équipement de musculation physique dans le monde réel. " +
+    "Une icône, un logo, un dessin, une illustration, une capture d'écran ou un objet ambigu = false. " +
+    'Réponds UNIQUEMENT en JSON: {"isRealGymPhoto":true|false}.';
+  const gate = await callModel({
+    model: MODEL,
+    messages: [{ role: 'user', content: [
+      { type: 'text', text: gatePrompt },
+      { type: 'image_url', image_url: { url: img.dataUrl } },
+    ] }],
+    max_tokens: 50,
+    temperature: 0,
+  });
+  if (gate.error) return sendModelError(req, reply, 'recognize-exercise-gate', gate);
+  const gateParsed = extractJson(gate.content);
+  if (gateParsed?.isRealGymPhoto !== true) {
+    return reply.send({ label: null, candidates: [] });
+  }
+
   const list = sanitizeNameList(allowedExercises);
   const listText = list.length ? `\nListe autorisée (utilise les noms EXACTS): ${list.join(', ')}` : '';
 
