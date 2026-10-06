@@ -192,6 +192,7 @@ const canonIndex = (names) => new Map(names.map((n) => [n.toLowerCase(), n]));
 
 // /recognize-exercise -> { label, candidates: [{ exercise, confidence, muscleGroup, inList }] } (max 3).
 export function normalizeRecognition(parsed, allowedList) {
+  if (parsed?.isGymEquipment === false) return { label: null, candidates: [] };
   if (!parsed || typeof parsed !== 'object') return { label: null, candidates: [] };
   const index = allowedList && allowedList.length ? canonIndex(allowedList) : null;
   const raw = Array.isArray(parsed.candidates) ? parsed.candidates : [];

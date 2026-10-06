@@ -176,6 +176,11 @@ test('normalizeRecognition : forme, inList, muscleGroup, max 3', () => {
   ]);
 });
 
+test('normalizeRecognition : image non machine => aucun candidat', () => {
+  const r = normalizeRecognition({ isGymEquipment: false, label: 'logo', candidates: [{ exercise: 'Squat', confidence: 1 }] }, ['Squat']);
+  assert.deepEqual(r, { label: null, candidates: [] });
+});
+
 test('normalizeRecognition : sans liste / entrée invalide', () => {
   assert.deepEqual(normalizeRecognition(null, []), { label: null, candidates: [] });
   const r = normalizeRecognition({ label: null, candidates: [{ exercise: 'Curl' }] }, []);

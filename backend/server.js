@@ -110,6 +110,7 @@ app.post('/recognize-exercise', { config: { rateLimit: IMAGE_RATE } }, async (re
     "Si l'exercice N'EST PAS dans la liste, propose quand même son nom réel et correct (ne force pas un mauvais mapping). " +
     "Pour CHAQUE candidat, indique le groupe musculaire principal parmi: chest, back, legs, shoulders, arms, abs. " +
     "Donne les 3 exercices les plus probables, du plus au moins probable. " +
+    "Garde-fou: si la photo ne montre pas clairement une vraie machine ou un équipement de musculation (ex. logo, icône, dessin, objet ambigu), retourne isGymEquipment=false, label=null et candidates=[]. Ne déduis JAMAIS un exercice uniquement depuis la liste autorisée. Sinon retourne isGymEquipment=true. " +
     "Réponds UNIQUEMENT en JSON, sans texte autour: " +
     '{"label":"<texte lu sur la machine, ou null>","candidates":[{"exercise":"<nom>","confidence":<0 à 1>,"muscleGroup":"<chest|back|legs|shoulders|arms|abs>","inList":<true si nom exact de la liste, sinon false>}]}.' +
     listText;
